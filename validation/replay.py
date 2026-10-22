@@ -1,4 +1,9 @@
-"""Replay a random stream recorded from Octave (see recshim/)."""
+"""Replay recorded Octave draws and indices (not weighted RNG equivalence).
+
+Legacy recordings contain selected indices rather than the uniform draws
+and weights that selected them. Validate their support and expose the actual
+probabilities supplied by Python so validate.py can check them separately.
+"""
 import numpy as np
 from scipy.io import loadmat
 
@@ -14,8 +19,11 @@ class ReplayRNG:
         offs = np.concatenate([[0], np.cumsum(lens)])
         self.entries = [(KIND[k], vals[offs[i]:offs[i + 1]]) for i, k in enumerate(kinds)]
         self.pos = 0
+        self.last_probabilities = None
 
     def _pop(self, kind, n=None):
+        if self.pos >= len(self.entries):
+            raise RuntimeError(f"recorded stream exhausted while requesting {kind}")
         k, v = self.entries[self.pos]
         if k != kind or (n is not None and v.size != n):
             raise RuntimeError(f"replay mismatch at {self.pos}: expected {kind}({n}), recorded {k}({v.size})")
@@ -35,7 +43,20 @@ class ReplayRNG:
         return self._pop("randi", int(k)).astype(int) - 1
 
     def randsample(self, n, k, w):
-        return self._pop("randsample", int(k)).astype(int) - 1
+        w = np.asarray(w, dtype=float).ravel(order="F")
+        total = np.sum(w)
+        if (w.size != n or not np.all(np.isfinite(w)) or np.any(w < 0)
+                or not np.isfinite(total) or total <= 0):
+            raise ValueError("resampling weights must be finite, nonnegative, nonzero and match n")
+        self.last_probabilities = w / total
+        recorded = self._pop("randsample", int(k))
+        if (not np.all(np.isfinite(recorded)) or np.any(recorded != np.floor(recorded))
+                or np.any(recorded < 1) or np.any(recorded > n)):
+            raise ValueError("recorded resampling indices are outside the requested population")
+        indices = recorded.astype(int) - 1
+        if np.any(w[indices] <= 0):
+            raise ValueError("recorded resampling index has zero probability under supplied weights")
+        return indices
 
     @property
     def done(self):

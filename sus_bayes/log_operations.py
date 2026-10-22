@@ -148,14 +148,14 @@ def logcumsum(A, axis):
     """Logarithmic version of cumsum along ``axis`` (0 or 1)."""
     A = np.atleast_2d(A)
     nrow, ncol = A.shape
-    B = np.zeros((nrow, ncol))
+    B = np.zeros((nrow, ncol), dtype=complex if np.iscomplexobj(A) else float)
     if axis == 0:
         for k in range(nrow):
             B[k, :] = logsum(A[:k + 1, :], 0)
     elif axis == 1:
         for k in range(ncol):
             B[:, k] = logsum(A[:, :k + 1], 1)[:, 0]
-    return B
+    return _real_if_possible(B)
 
 
 def logstd(A, axis=None):
