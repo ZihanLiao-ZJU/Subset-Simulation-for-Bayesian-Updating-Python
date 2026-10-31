@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..log_operations import logmean, logminus, logsum
+from ..operations_on_logarithmic_values import logmean, logminus, logsum
 
 _EPS = np.finfo(float).eps
 
