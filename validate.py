@@ -38,8 +38,8 @@ def make_lkf(case, ndim):
             "eggbox": lambda: sb.LKF_2D_Eggbox()}[case]()
 
 
-def run_once(Tfun, nsam=1000):
-    ss = sb.Main(sb.aCS(sb.SuS_Bay_Nataf(Tfun)))
+def run_once(Tfun, nsam=1000, rng=None):
+    ss = sb.Main(sb.aCS(sb.SuS_Bay_Nataf(Tfun), rng=rng))
     ss.NumSam = nsam
     ss.Verbose = False
     out = ss.RunIte()
@@ -82,7 +82,8 @@ def posterior_weight_error(out, ps):
         likelihood = _utils.flat(out["y"][i])[2]
         expected = likelihood + log_probability - ps.Z
         if i + 1 < out["Nite"]:
-            threshold = out["g"][i + 1][2]
+            g = out["g"][i + 1]
+            threshold = (g["parameters"] if isinstance(g, dict) else g)[2]
             expected = np.where(likelihood < threshold, expected, -np.inf)
         expected = expected.reshape(tuple(out["Nsze"][i]), order="F")
         error = max(error, array_error(ps.Wpos[i], expected))
@@ -110,7 +111,7 @@ def replay(reference_dir=None):
         try:
             rng = ReplayRNG(os.path.join(reference_dir, f"rec_{tag}.mat"))
             _utils.set_rng(rng)
-            out, ps = run_once(make_lkf(case, ndim))
+            out, ps = run_once(make_lkf(case, ndim), rng=rng)
             dw = posterior_weight_error(out, ps)
             x_pos = ps.PosSim()[0]
             # Check the probabilities actually handed to the resampler, not
@@ -125,7 +126,7 @@ def replay(reference_dir=None):
                 dw = max(dw, array_error(rng.last_probabilities, probabilities))
             cv = np.array(ps.EvlVar())
             r = loadmat(os.path.join(reference_dir, f"res_{tag}.mat"))
-            dG = array_error(np.vstack(out["g"]), r["G"])
+            dG = array_error(np.vstack([g["parameters"] for g in out["g"]]), r["G"])
             dx = array_error(x_pos, r["x_pos"])
             dcv = array_error(cv, np.array([r["c_z_hat"].item(), r["c_z"].item()]))
             # Future independently recorded files may include the Wpos cell

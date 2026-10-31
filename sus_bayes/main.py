@@ -74,7 +74,10 @@ class Main:
 
         if flg_IntD:
             Nite_int = len(self.G)
-            g[:Nite_int] = list(self.G)
+            g[:Nite_int] = [dict(v) if isinstance(v, dict) else {"parameters": np.asarray(v), "lambda": 0.6} for v in self.G]
+            intBay = copy.copy(intBay)
+            intBay.G = g[0]
+            sampler.BayStc = intBay
         else:
             Nite_int = 0
             g[0] = intBay.G
@@ -86,15 +89,16 @@ class Main:
             # === Sample generation ===
             if np.all(Nsze[i, :] > 0) and not np.isnan(Nsze[i, 1]):
                 if ite == 1:
-                    x[i], y[i], Ncal[i] = sampler.SamGen(int(Nsze[i, 0]), int(Nsze[i, 1]))[:3]
+                    x[i], y[i], Ncal[i], intBay = sampler.SamGen(int(Nsze[i, 0]), int(Nsze[i, 1]))
                 else:
-                    x[i], y[i], Ncal[i] = sampler.SamGen(x_sed, y_sed, int(Nsze[i, 1]))[:3]
+                    x[i], y[i], Ncal[i], intBay = sampler.SamGen(x_sed, y_sed, int(Nsze[i, 1]))
             Nsam[i] = int(np.prod(Nsze[i, :]))
 
             # === Update intermediate distribution ===
             if ite + 1 <= Nite_int:
                 intBay = copy.copy(intBay)
-                intBay.G = g[i + 1]
+                intBay.G = {**g[i + 1], **{k: intBay.G[k] for k in ("lambda", "HMC_time") if k in intBay.G}}
+                g[i + 1] = intBay.G
             else:
                 g[i + 1], intBay = intBay.UpdObj(y[i], p)
             sampler.BayStc = intBay

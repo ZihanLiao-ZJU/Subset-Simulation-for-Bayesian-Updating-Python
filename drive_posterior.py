@@ -9,6 +9,8 @@ import argparse
 
 import numpy as np
 
+from sus_bayes.mcmc_samplers import CW_aMH, aCS, HMC, ES
+
 from sus_bayes import (LKF_2D_Eggbox, LKF_nD_GaussianLogGamma, LKF_nD_GaussianShells,  # noqa: F401
                        Main, NumSim, SuS_Bay_Nataf, aCS)
 from sus_bayes.support_functions import SamPlt
@@ -17,7 +19,9 @@ parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.R
 parser.add_argument("--nrun", type=int, default=5, help="number of repeated runs (default 5)")
 parser.add_argument("--seed", type=int, default=None, help="random seed")
 parser.add_argument("--plot", action="store_true", help="plot the posterior samples of the last run")
+parser.add_argument("--sampler", choices=["CW_aMH", "aCS", "HMC", "ES"], default="aCS")
 args = parser.parse_args()
+SamplerClass = {"CW_aMH": CW_aMH, "aCS": aCS, "HMC": HMC, "ES": ES}[args.sampler]
 if args.seed is not None:
     np.random.seed(args.seed)
 
@@ -35,7 +39,7 @@ Tfun = LKF_nD_GaussianShells(Ndim)       # multimodal shell-shaped posterior
 
 # %% Construct sampler and subset simulation framework
 IntBay = SuS_Bay_Nataf(Tfun)
-sampler = aCS(IntBay)
+sampler = SamplerClass(IntBay)
 ss = Main(sampler)
 ss.NumSam = Nsam
 

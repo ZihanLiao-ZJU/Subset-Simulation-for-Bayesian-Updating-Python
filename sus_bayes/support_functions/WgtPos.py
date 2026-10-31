@@ -12,7 +12,7 @@ def WgtPos(g, y):
         with np.errstate(divide="ignore", invalid="ignore"):
             w = yi[2, :] + yi[3, :] - yi[0, :] - yi[1, :]
             if ite < Nite - 1:
-                w = w + np.log((yi[2, :] < g[ite + 1][2]).astype(float))
+                w = w + np.log((yi[2, :] < g[ite + 1]["parameters"][2]).astype(float))
         w = reshape_F(w, tail_shape(y[ite])).astype(float)
         w[np.isnan(w)] = -np.inf
         w_pos[ite] = w

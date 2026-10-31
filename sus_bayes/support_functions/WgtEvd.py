@@ -18,11 +18,11 @@ def WgtEvd(g, y):
     Nite = len(y)
     w_evd = [None] * Nite
     for ite in range(Nite - 1):
-        Li = g[ite][2]
-        Li1 = g[ite + 1][2]
+        Li = g[ite]["parameters"][2]
+        Li1 = g[ite + 1]["parameters"][2]
         w = _mmin(logminus(flat(y[ite])[2, :], Li), logminus(Li1, Li))
         w_evd[ite] = reshape_F(w, tail_shape(y[ite]))
-    Li = g[Nite - 1][2]
+    Li = g[Nite - 1]["parameters"][2]
     w = logminus(flat(y[Nite - 1])[2, :], Li)
     w_evd[Nite - 1] = reshape_F(w, tail_shape(y[Nite - 1]))
     return w_evd

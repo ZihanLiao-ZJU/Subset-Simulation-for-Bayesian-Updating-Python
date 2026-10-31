@@ -28,7 +28,7 @@ class SuS_Bay_Nataf:
         self.Ncal = None
         self.X = None
         self.Y = None
-        self.G = np.array([-np.inf, 0, -np.inf, 0, -np.inf, -np.inf, -np.inf])
+        self.G = {"parameters": np.array([-np.inf, 0, -np.inf, 0, -np.inf, -np.inf, -np.inf]), "lambda": 0.6}
 
     def EvlY(self, u):
         """Evaluate [log-likelihood; log-prior] at samples u [Ndim x Nsam]."""
@@ -44,7 +44,7 @@ class SuS_Bay_Nataf:
     def EvlLKF(self):
         """Intermediate likelihood function (log indicator)."""
         L = self.Y[0, :]
-        L_i = self.G[2]
+        L_i = self.G["parameters"][2]
         if np.isinf(L_i):
             return np.zeros_like(L)
         with np.errstate(divide="ignore"):
@@ -61,7 +61,7 @@ class SuS_Bay_Nataf:
         Returns (g, obj).
         """
         obj = copy.copy(self)
-        g = obj.G
+        g = obj.G["parameters"]
         L_i, p_i, z_i, z_tmp, z_sum = g[2], g[3], g[4], g[5], g[6]
         L = flat(y)[2, :]
         Nsam = L.size
@@ -79,15 +79,15 @@ class SuS_Bay_Nataf:
         z_sum1 = logplus(logplus(logminus(z_sum, z_tmp), z_i), z_tmp1)
 
         g = np.array([L_i, p_i, L_i1, p_i1, z_i1, z_tmp1, z_sum1], dtype=float)
-        obj.G = g
-        return g, obj
+        obj.G = {**obj.G, "parameters": g}
+        return obj.G, obj
 
     def SltSed(self, u, y, Nsam):
         """Select seed samples for the next iteration."""
         u = flat(u)[:self.Ndim, :]
         y = flat(y)[:self.Nfun, :]
         L = y[2, :]
-        L_i1 = self.G[2]
+        L_i1 = self.G["parameters"][2]
         Ns = mround(Nsam / np.arange(1, Nsam + 1))
         Nsed = mround(Nsam / Ns)
         ind_sed = L > L_i1
@@ -120,7 +120,7 @@ class SuS_Bay_Nataf:
     @property
     def FlgCvg(self):
         """Convergence flag based on the change in thresholds and evidence."""
-        g = self.G
+        g = self.G["parameters"]
         L_i, L_i1, z_tmp, z_sum = g[0], g[2], g[5], g[6]
         with np.errstate(invalid="ignore", over="ignore"):
             a = np.real(np.exp(logminus(L_i1, L_i) - logplus(L_i1, L_i)))
