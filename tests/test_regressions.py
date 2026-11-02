@@ -30,34 +30,35 @@ class NatafTests(unittest.TestCase):
         assert_allclose(prior.U2X(u), expected)
         assert_allclose(prior.U2X(u.reshape(3, 1, 3)), expected.reshape(3, 1, 3))
 
-    def test_parameterized_fast_paths_keep_tail_stability(self):
-        prior = Nataf([makedist("Normal", mu=2, sigma=3),
-                       makedist("Lognormal", mu=.2, sigma=.4)], np.eye(2))
-        u = np.array([[-12., 12.]] * 2)
-        expected = np.array([2 + 3 * u[0], np.exp(.2 + .4 * u[1])])
-        assert_allclose(prior.U2X(u), expected)
-        self.assertTrue(np.all(np.isfinite(prior.U2X(u))))
+    def test_parameterized_tails_follow_original_cdf_icdf(self):
+        marginals = [makedist("Normal", mu=2, sigma=3),
+                     makedist("Lognormal", mu=.2, sigma=.4)]
+        u = np.array([[-12., 0., 12.]] * 2)
+        expected = np.array([m.icdf(norm.cdf(row)) for m, row in zip(marginals, u)])
+        np.testing.assert_array_equal(Nataf(marginals, np.eye(2)).U2X(u), expected)
+        self.assertTrue(np.isposinf(expected[:, -1]).all())
 
-    def test_gev_clipping_policy_preserved(self):
+    def test_gev_original_no_clipping_policy(self):
         marg = makedist("GeneralizedExtremeValue", k=.2)
-        prior = Nataf([marg], np.eye(1))
         u = np.array([[-12., 0., 8., 12.]])
-        expected = marg.icdf(np.clip(norm.cdf(u), 1e-15, 1 - 1e-15))
-        assert_allclose(prior.U2X(u), expected)
-        self.assertTrue(np.all(np.isfinite(prior.U2X(u))))
+        expected = marg.icdf(norm.cdf(u))
+        np.testing.assert_array_equal(Nataf([marg], np.eye(1)).U2X(u), expected)
 
-    def test_uniform_correlation_positive_negative_and_zero(self):
-        for rho in (-.5, 0., .5):
-            with self.subTest(rho=rho):
-                prior = Nataf([makedist("Uniform")] * 2, [[1., rho], [rho, 1.]])
-                expected = 2 * np.sin(np.pi * rho / 6)
-                assert_allclose(prior.Rho_U[0, 1], expected, atol=5e-5)
+    def test_original_uniform_correlation_interval(self):
+        for rho in (0., .5):
+            prior = Nataf([makedist("Uniform")] * 2, [[1., rho], [rho, 1.]])
+            assert_allclose(prior.Rho_U[0, 1], 2 * np.sin(np.pi * rho / 6), atol=5e-5)
+        # Original MATLAB's positive-only interval does not fit negative pairs.
+        negative = Nataf([makedist("Uniform")] * 2, [[1., -.5], [-.5, 1.]])
+        self.assertGreaterEqual(negative.Rho_U[0, 1], 0.)
+        self.assertLess(negative.Rho_U[0, 1], 1e-3)
 
-    def test_zero_pair_inside_nonidentity_matrix(self):
+    def test_original_mixed_zero_pair_uses_quadrature(self):
         prior = Nataf([makedist("Uniform")] * 3,
                       [[1., .3, 0.], [.3, 1., -.3], [0., -.3, 1.]])
-        self.assertEqual(prior.Rho_U[0, 2], 0.)
-        self.assertLess(prior.Rho_U[1, 2], 0.)
+        self.assertGreater(prior.Rho_U[0, 2], 0.)
+        self.assertLess(prior.Rho_U[0, 2], 1e-3)
+        self.assertGreaterEqual(prior.Rho_U[1, 2], 0.)
 
 
 class SignedLogTests(unittest.TestCase):

@@ -63,9 +63,7 @@ class Nataf:
                     d1 = self.Marg_X[i].DistributionName.lower()
                     d2 = self.Marg_X[j].DistributionName.lower()
                     rho_x = self.Rho_X[i, j]
-                    if rho_x == 0:
-                        Rho_U[i, j] = 0.0
-                    elif d1 == "normal" and d2 == "normal":
+                    if d1 == "normal" and d2 == "normal":
                         Rho_U[i, j] = rho_x
                     elif d1 == "normal" and d2 == "lognormal":
                         cv_j = self.Marg_X[j].std() / self.Marg_X[j].mean()
@@ -92,11 +90,9 @@ class Nataf:
                                 np.exp(-1 / (2 * (1 - rho_u ** 2)) *
                                        (u[:, 0] ** 2 - 2 * rho_u * u[:, 0] * u[:, 1] + u[:, 1] ** 2))))
 
-                        # The inverse-CDF maps are increasing, so the latent
-                        # correlation has the same sign as the target. The
-                        # MATLAB source's (0, 1) interval loses negative pairs.
-                        bounds = (-1, 0) if rho_x < 0 else (0, 1)
-                        res = minimize_scalar(rhoU2X_err, bounds=bounds, method="bounded",
+                        # Preserve the original MATLAB search interval, including
+                        # its limitation for negative nonstandard correlations.
+                        res = minimize_scalar(rhoU2X_err, bounds=(0, 1), method="bounded",
                                               options={"xatol": 1e-4})
                         Rho_U[i, j] = res.x
                     Rho_U[j, i] = Rho_U[i, j]
@@ -114,22 +110,9 @@ class Nataf:
         Z = np.einsum("ij,j...->i...", self.RhoL_U, U)
         X = np.zeros_like(Z)
         for idim in range(self.Ndim):
-            marg = self.Marg_X[idim]
-            name = marg.DistributionName.lower()
-            has_normal_params = all(hasattr(marg, p) for p in ("mu", "sigma"))
-            if name == "normal" and has_normal_params:
-                X[idim] = marg.mu + marg.sigma * Z[idim]
-            elif name == "lognormal" and has_normal_params:
-                X[idim] = np.exp(marg.mu + marg.sigma * Z[idim])
-            elif name == "generalized extreme value" and all(
-                    hasattr(marg, p) for p in ("mu", "sigma", "k")):
-                p = np.clip(norm.cdf(Z[idim]), 1e-15, 1 - 1e-15)
-                if abs(marg.k) < 1e-12:
-                    X[idim] = marg.mu - marg.sigma * np.log(-np.log(p))
-                else:
-                    X[idim] = marg.mu + (marg.sigma / marg.k) * ((-np.log(p)) ** (-marg.k) - 1)
-            else:
-                X[idim] = marg.icdf(norm.cdf(Z[idim]))
+            # Original MATLAB composition; no tail clipping or marginal-specific
+            # bypass. Preserve all trailing sample axes and model dimensions.
+            X[idim] = self.Marg_X[idim].icdf(norm.cdf(Z[idim]))
         return X
 
     def X2U(self, X):
