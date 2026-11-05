@@ -75,7 +75,6 @@ pip install -r requirements.txt
     │   ├── LKF_nD_GaussianLogGamma.py
     │   ├── LKF_nD_GaussianShells.py
     │   └── __init__.py
-    ├── log_operations.py
     ├── main.py
     ├── mcmc_samplers/
     │   ├── CW_aMH.py
@@ -94,10 +93,7 @@ pip install -r requirements.txt
         ├── RS.py
         ├── ResRat.py
         ├── SamPlt.py
-        ├── SedSlt.py
-        ├── VabCat.py
         ├── VabCmb.py
-        ├── VabSrk.py
         ├── WgtEvd.py
         ├── WgtPos.py
         ├── __init__.py

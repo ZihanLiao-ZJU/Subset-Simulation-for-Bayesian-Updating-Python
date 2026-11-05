@@ -43,7 +43,7 @@ import copy
 import numpy as np
 
 from ._utils import flat, mround, randi, randperm
-from .log_operations import logmean, logminus, logplus
+from .operations_on_logarithmic_values import logmean, logminus, logplus
 from .support_functions.WgtEvd import _mmin
 from .support_functions.logGauss import logGauss
 

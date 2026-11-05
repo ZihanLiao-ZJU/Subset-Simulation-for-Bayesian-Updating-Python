@@ -1,7 +1,7 @@
 import numpy as np
 
 from .._utils import reshape_F, tail_shape
-from ..log_operations import logminus
+from ..operations_on_logarithmic_values import logminus
 from .._utils import flat
 
 

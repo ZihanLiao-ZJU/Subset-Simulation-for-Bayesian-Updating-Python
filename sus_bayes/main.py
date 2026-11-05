@@ -123,7 +123,6 @@ import copy
 import numpy as np
 from ._utils import mround
 from .support_functions.DspRst import DspRst
-from .support_functions.SedSlt import SedSlt
 
 class SubsetBayesMethod(Method):
     def start(self,owner,rng):

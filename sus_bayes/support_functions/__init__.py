@@ -2,10 +2,7 @@ from .CorMod import CorMod
 from .CorMod_cross import CorMod_cross
 from .DspRst import DspRst
 from .ResRat import ResRat
-from .SedSlt import SedSlt
-from .VabCat import VabCat
 from .VabCmb import VabCmb
-from .VabSrk import VabSrk
 from .WgtEvd import WgtEvd
 from .WgtPos import WgtPos
 from .logGauss import logGauss
