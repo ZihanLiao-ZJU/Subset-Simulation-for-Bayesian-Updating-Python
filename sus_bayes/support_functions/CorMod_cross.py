@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..operations_on_logarithmic_values import logmean, logminus, logsum
+from ..log_operations import logmean, logminus, logsum
 
 
 def CorMod_cross(F, I):
