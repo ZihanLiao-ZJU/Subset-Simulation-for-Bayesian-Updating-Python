@@ -14,7 +14,6 @@ Python implementation of subset simulation (SuS) for Bayesian evidence estimatio
 - [Benchmark likelihoods](#benchmark-likelihoods)
 - [Custom likelihood](#custom-likelihood)
 - [Outputs](#outputs)
-- [Validation against MATLAB](#validation-against-matlab)
 - [Differences from the MATLAB version](#differences-from-the-matlab-version)
 - [Citation](#citation)
 - [License](#license)
@@ -58,24 +57,51 @@ pip install -r requirements.txt
 
 ## Repository structure
 
-```
-.
-├── drive_evidence.py                    # driver: log-evidence estimation over repeated runs
-├── drive_posterior.py                   # driver: posterior sampling and effective sample size
-├── validate.py                          # comparison with the MATLAB implementation
-├── sus_bayes/
-│   ├── SuS_Bay_Nataf.py                 # core: subset simulation for Bayesian updating (levels, seeds, convergence)
-│   ├── main.py                          # sequential sampling loop (MATLAB class `main`, here `Main`)
-│   ├── NumSim.py                        # post-processing: evidence, posterior resampling, CoV estimates
-│   ├── Nataf.py                         # Nataf transformation between physical and standard normal space
-│   ├── distributions.py                 # `makedist`: MATLAB-style distribution objects on top of scipy.stats
-│   ├── mcmc_samplers/aCS.py             # adaptive conditional sampling
-│   ├── likelihood_functions/            # benchmark likelihoods
-│   ├── support_functions/               # weights, CoV correction, seed selection, plotting and other helpers
-│   └── log_operations.py                # log-domain arithmetic (logsum, logplus, logmean, ...)
-├── validation/                          # MATLAB random streams and results used by validate.py
+```text
 ├── LICENSE
-└── README.md
+├── README.md
+├── drive_evidence.py
+├── drive_posterior.py
+├── requirements.txt
+└── sus_bayes/
+    ├── Nataf.py
+    ├── NumSim.py
+    ├── SuS_Bay_Nataf.py
+    ├── __init__.py
+    ├── _utils.py
+    ├── distributions.py
+    ├── likelihood_functions/
+    │   ├── LKF_2D_Eggbox.py
+    │   ├── LKF_nD_GaussianLogGamma.py
+    │   ├── LKF_nD_GaussianShells.py
+    │   └── __init__.py
+    ├── log_operations.py
+    ├── main.py
+    ├── mcmc_samplers/
+    │   ├── CW_aMH.py
+    │   ├── ES.py
+    │   ├── HMC.py
+    │   ├── LICENSE
+    │   ├── MCMCBase.py
+    │   ├── __init__.py
+    │   └── aCS.py
+    ├── operations_on_logarithmic_values/
+    │   └── __init__.py
+    └── support_functions/
+        ├── CorMod.py
+        ├── CorMod_cross.py
+        ├── DspRst.py
+        ├── RS.py
+        ├── ResRat.py
+        ├── SamPlt.py
+        ├── SedSlt.py
+        ├── VabCat.py
+        ├── VabCmb.py
+        ├── VabSrk.py
+        ├── WgtEvd.py
+        ├── WgtPos.py
+        ├── __init__.py
+        └── logGauss.py
 ```
 
 ## Quick start
@@ -185,50 +211,7 @@ During each run, the progress of every level is printed (sample size, number of 
 | `Ness` | effective sample size of each run |
 | `Ness_rat_mu` | average effective sample size per likelihood evaluation |
 
-## Validation against MATLAB
-
-```bash
-python validate.py
-```
-
-1. **Recorded-stream replay.** `validation/reference/` contains draws and selected resampling indices from six runs of the MATLAB source under **GNU Octave 8.4**, plus their outputs. `validate.py` requires all six stream/result pairs, rejects NaNs and signed-infinity mismatches, and compares levels, thresholds, evidence, likelihood-call counts, CoV estimates and indexed posterior samples to round-off. This is not a native MATLAB execution. Weighted resampling replays selected indices, not the underlying uniforms: matching posterior samples alone therefore does **not** establish that weights or weighted random generators are equivalent.
-2. **Independent weight checks.** The validator separately recomputes the SuS posterior-weight equation from raw likelihoods and conditional level probabilities, checks every weight in sample order, and compares the normalized probabilities actually passed to the resampler. These are independent Python invariants, **not** newly recorded MATLAB/Octave reference weights. If a future independently generated result file contains a `Wpos` cell array, it is compared too; the legacy fixtures are unchanged.
-3. **Statistics.** 50 independent Python runs per benchmark (`--nrun` to change); the mean log-evidence is compared with the reference value.
-
-Results of `python validate.py --nrun 100` (the n = 10 shells case is only used for the replay):
-
-| Case | Replay vs MATLAB | Mean logZ (100 runs) | Std | Reference |
-|---|---|---|---|---|
-| Gaussian shells, n = 2 | identical | −1.737 | 0.097 | −1.75 |
-| Gaussian shells, n = 5 | identical | −5.649 | 0.215 | −5.67 |
-| Gaussian shells, n = 10 | identical | – | – | −14.59 |
-| Gaussian + LogGamma, n = 2 | identical | −8.188 | 0.184 | −8.19 |
-| Gaussian + LogGamma, n = 5 | identical | −20.455 | 0.448 | −20.47 |
-| Eggbox, n = 2 | identical | 235.653 | 0.517 | 235.856 |
-
-The reference streams were recorded by running the original MATLAB code under GNU Octave 8.4 (no MATLAB licence was available) with the scripts in `validation/matlab/`: they shadow `randn`, `rand`, `randperm`, `randi` and `randsample` to log every draw, and `validation/matlab/octave/` provides Octave stand-ins for `makedist`, `pagemtimes` and the `"all"` option of `max`, `min` and `sum`. Octave compares complex numbers by their modulus, so for the recording the sign tests in `logsum`, `logplus` and `logminus` were applied to `real(...)`, which is what MATLAB compares. MATLAB does not need any of these changes. To record them with MATLAB instead:
-
-```matlab
->> cd validation/matlab
->> record_reference('/path/to/Subset-Simulation-for-Bayesian-Updating', 'shells', 5, 1, '../reference')
-```
-
-### Regression tests and limits
-
-```bash
-python -m unittest discover -s tests -v
-python validate.py --replay
-```
-
-Tests cover frozen-distribution wrappers, stable parameterized transforms, signed
-cumulative log sums on both axes, positive/negative/zero Uniform correlations,
-missing/corrupt references, and deliberately permuted or misused resampling
-weights. One test is an **expected failure** for an inherited MATLAB `logsum`
-limitation: an all-negative signed-log slice (for example, a cumulative sum
-starting with a negative term) is not handled correctly. Fixing the complex
-output buffer in `logcumsum` preserves mixed-sign prefixes, but does not redesign
-that shared signed-log arithmetic. No native MATLAB parity is claimed by these
-tests, and a NumPy seed is not a MATLAB/Octave random-stream specification.
+Signed-log arithmetic retains an inherited limitation: an all-negative signed-log slice, including a negative first cumulative prefix, is not handled correctly by `logsum`. Preserving complex `logcumsum` outputs retains mixed-sign prefixes but does not change that reduction algorithm.
 
 ## Differences from the MATLAB version
 
@@ -237,7 +220,7 @@ tests, and a NumPy seed is not a MATLAB/Octave random-stream specification.
 - Random numbers are drawn through `sus_bayes._utils` (`randn`, `rand`, `randperm`, `randi`, `randsample`), backed by NumPy; `np.random.seed` fixes a run.
 - Frozen wrappers such as `Distribution("Normal", scipy.stats.norm(...))` need not expose `mu`/`sigma` attributes: they use their generic `icdf` mapping. Parameterized `makedist` Normal/Lognormal objects retain direct transforms to avoid CDF saturation in extreme tails.
 - Parameterized GEV transforms retain the Python port's existing CDF clipping to `[1e-15, 1 - 1e-15]` (and near-zero-shape limit). This stabilizes tails but is intentionally not identical to the MATLAB source's unclipped `icdf(normcdf(...))`; generic frozen wrappers use their own `icdf` instead.
-- General non-Normal/Lognormal correlation conversion now searches negative latent correlations for negative target pairs and preserves exactly zero pairs. This corrects the MATLAB source's inherited nonnegative search interval, rather than reproducing it. Python supplies `GauIntPot`, which is absent from the public MATLAB repository; tests use the analytic Uniform/Gaussian-copula correlation relation, not a live MATLAB comparison. Numerical quadrature and marginal correlation feasibility remain limitations for arbitrary distributions/extreme correlations.
+- General non-Normal/Lognormal correlation conversion now searches negative latent correlations for negative target pairs and preserves exactly zero pairs. This corrects the MATLAB source's inherited nonnegative search interval, rather than reproducing it. Python supplies `GauIntPot`, which is absent from the public MATLAB repository. Numerical quadrature and marginal correlation feasibility remain limitations for arbitrary distributions/extreme correlations.
 - `support_functions/ThdGen.m` is not ported: it is not called by the algorithm and depends on functions that are not part of the MATLAB repository.
 
 ## Citation
