@@ -37,7 +37,6 @@ class NumSim:
         self.NumSam = inp["Nsam"]
         self.SamSze = inp["Nsze"]
         self.IntBay = inp["intBay"]
-        self.H = None
 
         Nite = self.NumIte
         y = [np.array(v, copy=True) for v in self.Y]

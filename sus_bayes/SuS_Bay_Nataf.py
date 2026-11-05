@@ -1,3 +1,5 @@
+from semcs_core import configure_method_profile
+from semcs_core import state_property
 import copy
 
 import numpy as np
@@ -9,6 +11,17 @@ from .support_functions.logGauss import logGauss
 
 
 class SuS_Bay_Nataf:
+    @property
+    def Nsam(self):
+        if self.G.get("method_profile")=="closed_ties_unit_fallback_v1":
+            return self.G.get("run",{}).get("samples",1000)
+        return self.G.get("Nsam",1000)
+
+    @Nsam.setter
+    def Nsam(self,value):
+        if self.G.get("method_profile")=="closed_ties_unit_fallback_v1":
+            run=dict(self.G.get("run",{}));run["samples"]=value;self.G=dict(self.G,run=run)
+        else:self.G=dict(self.G,Nsam=value)
     """Subset simulation with Nataf transformation for Bayesian updating.
 
     Properties
@@ -21,14 +34,55 @@ class SuS_Bay_Nataf:
                [L_i, p_i, L_i1, p_i1, z_i1, z_tmp1, z_sum1]
     """
 
-    def __init__(self, LKF):
+
+    def sampler_profile_spec(self, method_profile="author_latest"):
+        """Method-owned author/article/legacy choices; core knows no profile IDs."""
+        variant="closed_ties_unit_fallback_v1"
+        if getattr(self,"G",{}).get("method_profile")==variant and method_profile!=variant:
+            raise ValueError("Use a fresh model to change an initialized closed-boundary method profile")
+        closed_variant=method_profile==variant
+        if closed_variant and getattr(self,"G",{}).get("method_profile") not in (None,variant):
+            raise ValueError("Construct a fresh closed-boundary model instead of switching an initialized method")
+        if closed_variant:method_profile="author_latest"
+        if method_profile=="paper_settings":method_profile="paper"
+        if method_profile not in {"author_latest","paper","public_20261102"}:
+            raise ValueError("Unknown method profile: "+str(method_profile))
+        paper=method_profile=="paper"
+        spec={'family': 'sus_bayes', 'default_kernel': 'aCS' if paper else 'aCS', 'kernels': {'aCS': {'Sigma0Mode': 'seed_std' if paper else 'unit', 'CarryLambda': False if paper else True}, 'ES': {'ESMode': 'coordinate' if paper else 'coordinate'}}, 'evidence': {'historical_table_generator_commit_authenticated': False, 'unknown_paper_budget_or_tolerance_not_filled': True, 'reference_factor_separate_from_kernel_base_scale': True, 'aCS_profile_support': 'CS-MH/article family plus author seed_std/reset' if paper else 'public20261102 legacy', 'ES_profile_support': 'retained coordinate implementation; not a global-ESS paper claim' if paper else 'retained coordinate implementation; not a global-ESS paper claim'}}
+        spec["name"]=method_profile
+        if method_profile=="author_latest":
+            spec["kernels"]["aCS"].update(Sigma0Mode='seed_std',CarryLambda=False,
+                Lambda=.6,AcpOpt=.44,NumIte=5,SedSav=False)
+            spec["kernels"]["aCS"].update(AcceptArithmetic="exp",GroupMode="fixed",AcceptanceRateMode="attempts")
+            spec["state"]={"lifecycle":{"InitialSampling":"sampler"}}
+            pass
+            spec["evidence"]["aCS_profile_support"]='latest available author srcv2 seed_std/reset'
+            spec["evidence"]["ES_profile_support"]='available author coordinate ES with Ntry20; not literal article global ESS'
+            spec["evidence"]["configuration_only_source_loop_not_reproduced"]=False
+        pass
+        if closed_variant:
+            spec["name"]=variant
+            if self.G.get("method_profile")==variant:
+                spec["kernels"]=copy.deepcopy(self.G.get("sampler",spec["kernels"]))
+            spec.setdefault("state",{}).update(boundary_rule="closed",
+                seed_scale_policy="unit_if_all_selected_reference_vectors_identical_else_baseline")
+            spec["evidence"].update(numerical_variant=True,paper_prescribed_tie_policy=False,
+                source_exact=False,completion_or_efficiency_guaranteed=False)
+        return spec
+
+    def __init__(self, LKF, *, method_profile="author_latest"):
         self.LKF = LKF
         self.Nfun = 4
         self.Ndim = LKF.Ndim
         self.Ncal = None
         self.X = None
         self.Y = None
-        self.G = {"parameters": np.array([-np.inf, 0, -np.inf, 0, -np.inf, -np.inf, -np.inf]), "lambda": 0.6}
+        self.G = {"parameters": np.array([-np.inf, 0, -np.inf, 0, -np.inf, -np.inf, -np.inf]), "lambda": 0.6, "L": np.eye(self.Ndim), "p": 0.1, "Nsam": 1000,
+                  "threshold_tol": 1e-1, "evidence_tol": 1e-1}
+        configure_method_profile(self,"sus_bayes",method_profile)
+        if self.G.get("method_profile")=="closed_ties_unit_fallback_v1":
+            state=dict(self.G);initial=state.pop("Nsam",1000);run=dict(state.get("run",{}))
+            run.setdefault("samples",initial);state["run"]=run;self.G=state
 
     def EvlY(self, u):
         """Evaluate [log-likelihood; log-prior] at samples u [Ndim x Nsam]."""
@@ -45,10 +99,18 @@ class SuS_Bay_Nataf:
         """Intermediate likelihood function (log indicator)."""
         L = self.Y[0, :]
         L_i = self.G["parameters"][2]
-        if np.isinf(L_i):
+        if np.isneginf(L_i) or (self.G.get("boundary_rule")!="closed" and np.isposinf(L_i)):
             return np.zeros_like(L)
         with np.errstate(divide="ignore"):
-            return np.log((L > L_i).astype(float))
+            return np.log(self.contains(L,L_i).astype(float))
+
+    def contains(self, log_likelihood, threshold):
+        """One method-owned support rule, including finite cached ties."""
+        values=np.asarray(log_likelihood)
+        if self.G.get("boundary_rule")=="closed":
+            if np.isneginf(threshold):return np.ones(values.shape,dtype=bool)
+            return values>=threshold
+        return values>threshold
 
     def EvlPDF(self):
         """Intermediate prior (log prior)."""
@@ -71,8 +133,9 @@ class SuS_Bay_Nataf:
             L_i1 = (L_sort[Nsed - 1] + L_sort[Nsed]) / 2
         else:
             L_i1 = L_sort[0]
+        hit_count=int(np.sum(self.contains(L,L_i1)))
         with np.errstate(divide="ignore"):
-            p_i1 = p_i + np.log(np.sum(L > L_i1) / Nsam)
+            p_i1 = p_i + np.log(hit_count / Nsam)
 
         z_i1 = p_i + logmean(_mmin(logminus(L, L_i), logminus(L_i1, L_i)), None)
         z_tmp1 = p_i + logmean(logminus(L, L_i), None)
@@ -80,6 +143,11 @@ class SuS_Bay_Nataf:
 
         g = np.array([L_i, p_i, L_i1, p_i1, z_i1, z_tmp1, z_sum1], dtype=float)
         obj.G = {**obj.G, "parameters": g}
+        if obj.G.get("boundary_rule")=="closed":
+            runtime=copy.deepcopy(obj.G.get("sus_runtime",{}))
+            runtime.update(effective_boundary_hit_fraction=hit_count/Nsam,
+                boundary_hit_count=hit_count,boundary_pool_count=int(Nsam))
+            obj.G=dict(obj.G,sus_runtime=runtime)
         return obj.G, obj
 
     def SltSed(self, u, y, Nsam):
@@ -90,7 +158,7 @@ class SuS_Bay_Nataf:
         L_i1 = self.G["parameters"][2]
         Ns = mround(Nsam / np.arange(1, Nsam + 1))
         Nsed = mround(Nsam / Ns)
-        ind_sed = L > L_i1
+        ind_sed = self.contains(L,L_i1)
         x_sed_can = u[:, ind_sed]
         y_sed_can = y[:, ind_sed]
         Nsed_can = int(np.sum(ind_sed))
@@ -106,6 +174,17 @@ class SuS_Bay_Nataf:
         y_sed = y_sed_can[:, randind]
         if y_sed.size:
             y_sed = self.UpdY(y_sed)
+        if self.G.get("boundary_rule")=="closed":
+            eligible=np.flatnonzero(ind_sed)
+            selected=eligible[randind]
+            steps=int(mround(Nsam/Nsed)) if Nsed else None
+            runtime=copy.deepcopy(self.G.get("sus_runtime",{}))
+            runtime.update(chain_plan=dict(Nc=Nsed,Ns=steps,actual_count=Nsed*steps if Nsed else 0),
+                last_seed_selection=dict(eligible_indices=eligible.tolist(),selected_indices=selected.tolist(),
+                    selected_positions=randind.tolist(),eligible_count=Nsed_can,selected_count=Nsed,
+                    pool_count=int(L.size),threshold=float(L_i1),boundary_rule="closed",index_base=0,
+                    closed_hit_fraction=Nsed_can/L.size))
+            self.G=dict(self.G,sus_runtime=runtime)
         return u_sed, y_sed
 
     def UpdY(self, y):
@@ -125,7 +204,7 @@ class SuS_Bay_Nataf:
         with np.errstate(invalid="ignore", over="ignore"):
             a = np.real(np.exp(logminus(L_i1, L_i) - logplus(L_i1, L_i)))
             b = np.real(np.exp(z_tmp - z_sum))
-        return bool(a < 1e-1 and b < 1e-1)
+        return bool(a < self.G["threshold_tol"] and b < self.G["evidence_tol"])
 
     def U2X(self, u):
         """Standard normal -> physical space via the Nataf transformation."""

@@ -1,0 +1,120 @@
+{
+  "release_scope": "qualified_profile_only",
+  "repository": "ZihanLiao-ZJU/Subset-Simulation-for-Bayesian-Updating-Python",
+  "language": "python",
+  "method_profile": "closed_ties_unit_fallback_v1",
+  "estimator": "source_native_evidence",
+  "sampler": {
+    "name": "aCS",
+    "Sigma0Mode": "seed_std",
+    "CarryLambda": false,
+    "Lambda": 0.6,
+    "AcpOpt": 0.44,
+    "NumIte": 5,
+    "SedSav": false,
+    "identical_selected_vectors_unit_fallback": true
+  },
+  "statistics": [
+    {
+      "case_id": "sus_bayes_eggbox2",
+      "N": 3801,
+      "n_attempts": 100,
+      "display_mean": 235.82589306979295,
+      "display_SD": 0.3177310013455061,
+      "mean_Ncal": 20178.67,
+      "Elog": 0.036618717718391786,
+      "source_Elog": 0.037240000000000016,
+      "ratio": 0.983316802319865
+    },
+    {
+      "case_id": "sus_bayes_loggamma2",
+      "N": 5975,
+      "n_attempts": 100,
+      "display_mean": -8.190469168169559,
+      "display_SD": 0.07200419074073162,
+      "mean_Ncal": 23915.0,
+      "Elog": 1.8484943567873588,
+      "source_Elog": 1.6863839999999997,
+      "ratio": 1.0961289699068297
+    },
+    {
+      "case_id": "sus_bayes_loggamma5",
+      "N": 7262,
+      "n_attempts": 1000,
+      "display_mean": -20.470712448383033,
+      "display_SD": 0.17051218583747293,
+      "mean_Ncal": 68645.818,
+      "Elog": 4.763094990537403,
+      "source_Elog": 4.970112,
+      "ratio": 0.9583476168217945
+    },
+    {
+      "case_id": "sus_bayes_shells5",
+      "N": 10399,
+      "n_attempts": 1000,
+      "display_mean": -5.675966477735783,
+      "display_SD": 0.06445374202579773,
+      "mean_Ncal": 51999.0,
+      "Elog": 6.719317254829847,
+      "source_Elog": 6.292000000000002,
+      "ratio": 1.0679143761649468
+    }
+  ],
+  "migration_proofs": [
+    {
+      "case": "sus_bayes_eggbox2",
+      "native_shared_exact_pairs": 100,
+      "scientific_projection_exact": true,
+      "full_G_equality_claimed": false,
+      "proof_report": "closed_review.json",
+      "proof_report_sha256": "5f2b3393e572bffcf94a30555d8d03398bf50f43c042f00ec8204e86fead9af2"
+    },
+    {
+      "case": "sus_bayes_loggamma2",
+      "native_shared_exact_pairs": 100,
+      "scientific_projection_exact": true,
+      "full_G_equality_claimed": false,
+      "proof_report": "closed_review.json",
+      "proof_report_sha256": "5f2b3393e572bffcf94a30555d8d03398bf50f43c042f00ec8204e86fead9af2"
+    },
+    {
+      "case": "sus_bayes_loggamma5",
+      "native_shared_exact_pairs": 100,
+      "scientific_projection_exact": true,
+      "full_G_equality_claimed": false,
+      "proof_report": "closed_review.json",
+      "proof_report_sha256": "5f2b3393e572bffcf94a30555d8d03398bf50f43c042f00ec8204e86fead9af2"
+    },
+    {
+      "case": "sus_bayes_shells5",
+      "native_shared_exact_pairs": 100,
+      "scientific_projection_exact": true,
+      "full_G_equality_claimed": false,
+      "proof_report": "closed_review.json",
+      "proof_report_sha256": "5f2b3393e572bffcf94a30555d8d03398bf50f43c042f00ec8204e86fead9af2"
+    }
+  ],
+  "limitations": [
+    "Qualification applies to the listed profile, estimator, targets and budgets; it does not cover every optional setting.",
+    "No global finite-sample unbiasedness or universal posterior accuracy claim is made.",
+    "The migration bias check uses100 same-seed native/shared pairs per case, not1000 paired runs; the1000 cohorts are independent precision studies.",
+    "Paper efficiency points are treated as fixed; their Monte Carlo uncertainty and rounding are not included. Confidence intervals do not waive the1.10 point gate.",
+    "Existing100-run cases are listed as100, never relabelled1000. Prior100 and1000 cohorts are not pooled.",
+    "The closed-support/identical-seed scale fallback is an explicitly declared numerical variant, not a boundary rule claimed to have been specified by the source paper. The old author_latest default remains available and is not the qualified entrypoint."
+  ],
+  "gate": "Elog/source_Elog <=1.10, no CI waiver and no runtime errors",
+  "Elog": "mean(Ncal)*(sample_SD(log Z)/abs(printed source log Zref))^2; ddof=1",
+  "bias_scope": "No new migration-induced difference in100 exact paired histories per case; global unbiasedness is not certified.",
+  "public_regression_compatibility": {
+    "tests": 21,
+    "ordinary_passes": 19,
+    "actual_failures": 0,
+    "expected_failures": 1,
+    "skipped": 1,
+    "description": "Public regression compatibility: generic arbitrary-chain coverage explicitly selects GroupMode=available (36 calls for12 chains and3 steps). A separate author_latest fixed-group test preserves the source five-group behavior (39 calls for the same shape), including its repeated last-chain visit. No model, engine, kernel or profile default changed.",
+    "limitations": "The preserved public suite ran21 small synthetic/contract tests:19 ordinary passes,1 documented expected failure for an inherited all-negative-prefix signed-log limitation, and1 explicit skip of a legacy MATLAB trajectory replay not qualifying the closed-support variant. Fixture-corruption checks remain active. This is a repository compatibility check, not another benchmark or evidence-unbiasedness certificate.",
+    "test_file_sha256": "964d8ebd8964d6d69bd0ead4f0b7b3649b634942658aa8ba9ac92f63fe3b1b6a",
+    "receipt_sha256": "50b2caed1717666b40cf065eaa20e181c40723d784c061a9b0374c08b22c31a9",
+    "scientific_benchmark_repeats": 0
+  }
+}

@@ -1,3 +1,4 @@
-numpy>=1.22
-scipy>=1.8
-matplotlib>=3.5  # optional, for plotting
+numpy>=1.24
+scipy>=1.10
+# Optional plots: matplotlib>=3.5
+# The byte-identical common semcs_core is bundled in this distribution.

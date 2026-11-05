@@ -122,7 +122,7 @@ class ValidationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate.statistics(1, 1)
 
-    @unittest.skip("Historical MATLAB fixtures use sample-std sigma and reset lambda; not current sigma=1/carried-state trajectories")
+    @unittest.skip("Legacy MATLAB trajectory fixtures do not qualify the closed-support profile; fixture mutation checks remain active")
     def test_bundled_replay(self):
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertTrue(validate.replay())
@@ -185,6 +185,9 @@ class UnifiedSamplerStateTests(unittest.TestCase):
             np.random.seed(123)
             target = sb.SuS_Bay_Nataf(sb.LKF_nD_GaussianShells(d))
             sampler = sb.aCS(target)
+            # This generic coverage test visits each chain once.
+            # The source fixed-group policy is tested separately below.
+            sampler.GroupMode = "available"
             u, y, _, target = sampler.SamGen(12, 1)
             target.G["lambda"] = .23
             sampler.BayStc = target
@@ -195,6 +198,25 @@ class UnifiedSamplerStateTests(unittest.TestCase):
             g, next_target = updated.UpdObj(y, .1)
             self.assertEqual(g["lambda"], updated.G["lambda"])
             self.assertEqual(next_target.G["lambda"], updated.G["lambda"])
+
+
+    def test_source_fixed_group_compatibility_cost(self):
+        import sus_bayes as sb
+        np.random.seed(123)
+        target = sb.SuS_Bay_Nataf(sb.LKF_nD_GaussianShells(3),
+                                  method_profile="author_latest")
+        sampler = sb.aCS(target)
+        self.assertEqual(sampler.GroupMode, "fixed")
+        self.assertEqual(sampler.NumIte, 5)
+        self.assertFalse(sampler.SedSav)
+        u, y, _, target = sampler.SamGen(12, 1)
+        sampler.BayStc = target
+        u, y, cost, _ = sampler.SamGen(u[:, :, 0], y[:, :, 0], 3)
+        self.assertEqual(u.shape, (3, 12, 3))
+        # Source grouping has width ceil(12/5)=3. Its fifth fixed group
+        # revisits the last chain: 3+3+3+3+1 visits per step, hence39 calls.
+        # This records source compatibility; it is not a generic36-call rule.
+        self.assertEqual(cost, 39)
 
 
 if __name__ == "__main__":

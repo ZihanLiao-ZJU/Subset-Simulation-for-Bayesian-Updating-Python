@@ -1,67 +1,43 @@
-# Subset Simulation for Bayesian Updating — Python
+# SuS Bayesian — unified SeMCS (python)
 
-## Overview
-Estimates log Bayesian evidence and obtains weighted/resampled posterior samples using subset simulation in Nataf standard-normal space. The default sampler is aCS. Optional kernels do not mean every combination was evaluated in the cited paper.
+This update retains the tested numerical algorithms and uses the common SeMCS engine and common MCMC implementation. Method-specific state and policies remain in the method classes; state evolves in G. The common core is bundled byte for byte so installation does not depend on an unreleased reliability repository.
 
-## Structure
-- `drive_evidence.py` — repeated-run example driver.
-- `drive_posterior.py` — posterior samples and weight-ESS diagnostics.
-- `sus_bayes/main.py` — sequential sampling loop.
-- `sus_bayes/SuS_Bay_Nataf.py` — intermediate distributions, seeds and stopping conditions.
-- `sus_bayes/NumSim.py` — evidence and posterior post-processing.
-- `sus_bayes/likelihood_functions/` — bundled likelihood/prior models.
-- `sus_bayes/mcmc_samplers/` — four kernels and their shared `MCMCBase` protocol.
-- `tests/` and `validation/` — regression and cross-language checks.
+## Qualified entrypoint
 
-## Quick start
-Run from this repository's root. Each checkout contains its own helpers and does not require a sibling repository.
+The qualified profile is `closed_ties_unit_fallback_v1`, with estimator `source_native_evidence`. The existing drivers and optional policies remain available for compatibility; use `run_qualified` for the settings in this table. No default is silently presented as paper-qualified.
 
 ```bash
-python -m pip install -r requirements.txt
-python drive_evidence.py --nrun 1 --seed 1 --sampler aCS
+python -m pip install .
+python run_qualified.py --case sus_bayes_eggbox2 --describe
+# python run_qualified.py --case sus_bayes_eggbox2 --seed 1  # one actual run
 ```
 
-Inspect both the returned loop flag and `intBay.FlgCvg` (the intermediate model's terminal condition). A zero-seed exit can precede the terminal check; a finite evidence estimate alone is not proof of convergence. Likelihood calls are reported by `Ncal`, not by the number of posterior resamples.
+## Source-paper comparison
 
-## Examples and samplers
-| Example | Model / dimension | Selector |
-|---|---|---|
-| Eggbox | Two-dimensional multimodal likelihood | `LKF_2D_Eggbox()` |
-| GaussianShells | Dimension supplied by the caller | `LKF_nD_GaussianShells(Ndim)` |
-| GaussianLogGamma | Dimension supplied by the caller, at least 2 | `LKF_nD_GaussianLogGamma(Ndim)` |
+Each row uses its declared independent repeat count. Elog is mean Ncal × [SD(log Z)/|printed source log Z reference|]², with sample SD (ddof=1). R=Elog/source Elog; the fixed acceptance limit is R≤1.10.
 
-The existing drivers use GaussianShells and 1000 samples per level: `drive_evidence` uses dimension 5 and 500 repetitions; `drive_posterior` uses dimension 2 and 5 repetitions. The default conditional probability is 0.1. The quick start is a small usage example, not a paper-reproduction experiment.
+| Case | Per-level N | Repeats | Mean log Z | SD log Z | Mean Ncal | Elog | Paper Elog | R |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| sus_bayes_eggbox2 | 3801 | 100 | 235.82589 | 0.317731 | 20178.67 | 0.036618718 | 0.03724 | 0.9833168 |
+| sus_bayes_loggamma2 | 5975 | 100 | -8.1904692 | 0.072004191 | 23915 | 1.8484944 | 1.686384 | 1.096129 |
+| sus_bayes_loggamma5 | 7262 | 1000 | -20.470712 | 0.17051219 | 68645.818 | 4.763095 | 4.970112 | 0.95834762 |
+| sus_bayes_shells5 | 10399 | 1000 | -5.6759665 | 0.064453742 | 51999 | 6.7193173 | 6.292 | 1.0679144 |
 
-Available samplers are `CW_aMH`, `aCS`, `HMC`, and `ES`. Use `--sampler aCS` (or another listed kernel).
+Source papers: [DOI 10.1016/j.ymssp.2025.112969](https://doi.org/10.1016/j.ymssp.2025.112969).
 
-All kernels implement `SamGen(Nchains, Nsteps)` or `SamGen(U_seed, Y_seed, Nsteps)` and return samples, packed outputs, evaluation count and updated Bayesian state. Arrays use `Ndim × Nchains × Nsteps`; packed output rows are the intermediate log-likelihood factor, Gaussian log density and cached model outputs. Sampler dimensions are model-defined, not hard-coded to two.
+## Scope and limitations
 
-## Dependencies
-Python with NumPy and SciPy (see `requirements.txt`); Matplotlib is optional for plots. Tests use the standard-library `unittest` runner. Python 3.12 was used for the focused checks; this is not a claim that every earlier Python version was tested.
+- Qualification applies to the listed profile, estimator, targets and budgets; it does not cover every optional setting.
+- No global finite-sample unbiasedness or universal posterior accuracy claim is made.
+- The migration bias check uses100 same-seed native/shared pairs per case, not1000 paired runs; the1000 cohorts are independent precision studies.
+- Paper efficiency points are treated as fixed; their Monte Carlo uncertainty and rounding are not included. Confidence intervals do not waive the1.10 point gate.
+- Existing100-run cases are listed as100, never relabelled1000. Prior100 and1000 cohorts are not pooled.
+- The closed-support/identical-seed scale fallback is an explicitly declared numerical variant, not a boundary rule claimed to have been specified by the source paper. The old author_latest default remains available and is not the qualified entrypoint.
 
-## Method & validation notes
-- **Implementation:** Intermediate thresholds, evidence/posterior formulas and model definitions are separate from the MCMC kernels. Numeric threshold vectors are stored in `G.parameters` (Python `G["parameters"]`); adaptation state occupies separate fields. The aCS `lambda` is a sampler scale, not the SeMIS intermediate-distribution threshold.
-- **Sampler policy:** aCS uses initial coordinate scale 1 and initial lambda 0.6, passing the final lambda to the next level. ES uses coordinatewise initial angles in `[0, pi]`. HMC uses analytic Gaussian-reference rotations with likelihood acceptance in Nataf space, not generic physical-space gradient integration.
-- **Outputs:** The primary evidence output is `NumSim.Z` (natural log). `EvlVar` estimates evidence uncertainty; the posterior driver computes evidence-correlation-adjusted weight ESS, not an ESS for every posterior coordinate. Resampled posterior draws may repeat or remain dependent.
-- **Validation scope:** Interface, same-seed trajectory and evaluation-accounting checks are not proof of agreement with all paper statistics. Historical aCS uses seed-based scales/reset adaptation, so the current policy can change termination and results. Stopping rules have not been relaxed to hide unsuccessful runs.
- The bundled suite includes one expected failure for the inherited all-negative signed-log reduction limitation. One historical aCS trajectory-fixture check is skipped because its old initialization differs from the current policy.
-- **History:** The Python port retains necessary signed-log, distribution-wrapper and reference-grid parity fixes. Nataf follows the original MATLAB CDF-to-inverse-CDF composition without tail clipping and its original positive-only nonstandard-correlation search interval; extreme normal/lognormal tails may therefore produce infinities, and negative nonstandard correlations are not correctly fitted. Arbitrary model dimensions and trailing sample axes are retained. The estimator, stopping rules, examples and driver defaults are unchanged.
+See `VALIDATION_SUMMARY.json` for exact profile settings and source-report SHA bindings; `SEMCS_CORE_MANIFEST.json` binds every bundled core file. Existing licenses are retained, with the core notice in `LICENSE_SEMCS_CORE`. No private papers, per-run research outputs or local machine paths are bundled.
 
+## Public regression compatibility
 
-- **Correlation scope:** Bundled examples use independent priors. The inherited MATLAB nonstandard-correlated-marginal branch references `GauIntPot`, which is not bundled; that branch is not independently runnable without the original helper. Python has its own quadrature implementation, but preserves the original positive-only search interval rather than extending negative-correlation support.
+Public regression compatibility: generic arbitrary-chain coverage explicitly selects GroupMode=available (36 calls for12 chains and3 steps). A separate author_latest fixed-group test preserves the source five-group behavior (39 calls for the same shape), including its repeated last-chain visit. No model, engine, kernel or profile default changed.
 
-## Reference & license
-[Paper DOI: 10.1016/j.ymssp.2025.112969](https://doi.org/10.1016/j.ymssp.2025.112969)
-```bibtex
-@article{liao2025likelihood,
-  title   = {From likelihood to limit state: A reliability-inspired framework for {B}ayesian evidence estimation and high-dimensional sampling},
-  author  = {Liao, Zihan and Li, Binbin and Wan, Hua-Ping},
-  journal = {Mechanical Systems and Signal Processing},
-  volume  = {237},
-  pages   = {112969},
-  year    = {2025},
-  doi     = {10.1016/j.ymssp.2025.112969}
-}
-```
-
-Licensed under the [MIT License](LICENSE); the original copyright notice is retained.
+The preserved public suite ran21 small synthetic/contract tests:19 ordinary passes,1 documented expected failure for an inherited all-negative-prefix signed-log limitation, and1 explicit skip of a legacy MATLAB trajectory replay not qualifying the closed-support variant. Fixture-corruption checks remain active. This is a repository compatibility check, not another benchmark or evidence-unbiasedness certificate.
