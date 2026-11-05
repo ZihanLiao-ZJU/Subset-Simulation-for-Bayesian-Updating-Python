@@ -54,6 +54,5 @@ class aCS(MCMCBase):
             else:raise ValueError('AcceptanceRateMode must be attempts or chain_steps.')
             if denominator and self.Adapt:lam=np.exp(np.log(lam)+(count/denominator-self.AcpOpt)/np.sqrt(group))
         b=self._setstate(b,'lambda',lam)
-        b.G=dict(b.G,aCS_sigma0=sigma0.copy() if scaled else np.ones(d))
         self.BayStc=b
         return u,y,n,b
