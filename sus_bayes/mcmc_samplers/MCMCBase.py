@@ -9,36 +9,12 @@ class MCMCBase:
                "AcceptArithmetic":"log","GroupMode":"available",
                "AcceptanceRateMode":"attempts","SeedUpdateMode":"each_step",
                "CoordinateMode":"identity","PriorMode":"standard_normal"}
-    def __getattribute__(self,name):
-        defaults=object.__getattribute__(self,"_defaults")
-        if name in defaults:
-            state=object.__getattribute__(self,"__dict__")
-            model=state.get("BayStc")
-            if model is not None:
-                return model.G.get("sampler",{}).get(type(self).__name__,{}).get(name,defaults[name])
-            return state.get("_pending",{}).get(name,defaults[name])
-        return object.__getattribute__(self,name)
-    def __setattr__(self,name,value):
-        defaults=type(self)._defaults
-        if name in defaults:
-            model=self.__dict__.get("BayStc")
-            if model is None:
-                self.__dict__.setdefault("_pending",{})[name]=value
-            else:
-                g=dict(model.G); all_settings=copy.deepcopy(g.get("sampler",{}))
-                settings=all_settings.setdefault(type(self).__name__,dict(defaults))
-                settings[name]=value; g["sampler"]=all_settings; model.G=g
-            return
-        object.__setattr__(self,name,value)
-        if name=="BayStc" and value is not None:
-            g=dict(value.G); all_settings=copy.deepcopy(g.get("sampler",{}))
-            settings={**defaults,**all_settings.get(type(self).__name__,{})}
-            all_settings[type(self).__name__]=settings
-            settings.update(self.__dict__.pop("_pending",{}))
-            g["sampler"]=all_settings; g["sampler_name"]=type(self).__name__; value.G=g
     def __init__(self, BayStc=None, rng=None):
-        self.BayStc = BayStc
-        self.rng = np.random if rng is None else rng
+        self.BayStc=BayStc
+        self.rng=np.random if rng is None else rng
+        self.__dict__.update(copy.deepcopy(self._defaults))
+        if BayStc is not None and hasattr(BayStc,"sampler_options"):
+            self.__dict__.update(BayStc.sampler_options(type(self).__name__))
     @property
     def Ndim(self): return self.BayStc.Ndim
     @property

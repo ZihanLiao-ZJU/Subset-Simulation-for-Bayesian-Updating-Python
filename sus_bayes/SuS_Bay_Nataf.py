@@ -1,39 +1,7 @@
-"""Generic validation/merge of a model-owned sampling profile specification.
-
-New method classes supply sampler_profile_spec(profile); no core method-family
-registration or algorithm-specific default is required.
-"""
+"""Subset simulation method and native Bayesian lifecycle."""
 import copy
-from collections.abc import Mapping
 
-def configure_method_profile(model, family, method_profile=None):
-    if method_profile is not None and (not isinstance(method_profile,str) or not method_profile):
-        raise ValueError("Method profile name must be a nonempty string")
-    provider=getattr(model,"sampler_profile_spec",None)
-    if not callable(provider):raise TypeError("Model must supply sampler_profile_spec(profile)")
-    spec=provider() if method_profile is None else provider(method_profile)
-    if not isinstance(spec,Mapping) or spec.get("family")!=family:
-        raise ValueError("Model profile family does not match the requested family")
-    profile_name=spec.get("name")
-    if not isinstance(profile_name,str) or not profile_name:raise ValueError("Model profile must supply its canonical name")
-    kernels=spec.get("kernels",{});method_state=spec.get("state",{})
-    if not isinstance(kernels,Mapping):
-        raise TypeError("Model profile kernels must be a mapping")
-    if not isinstance(method_state,Mapping):raise TypeError("Model profile state must be a mapping")
-    from .mcmc_samplers.MCMCBase import MCMCBase
-    g=copy.deepcopy(model.G);settings=copy.deepcopy(g.get("sampler",{}))
-    names=list(settings)
-    for name in ("aCS","ES","CW_aMH","HMC",*kernels):
-        if name not in names:names.append(name)
-    for name in names:
-        override=kernels.get(name,{})
-        if not isinstance(name,str) or not isinstance(override,Mapping):
-            raise TypeError("Kernel profile overrides must be named mappings")
-        settings[name]={**MCMCBase._defaults,**settings.get(name,{}),**copy.deepcopy(override)}
-    g.update(method_profile=profile_name,method_family=family,sampler=settings)
-    g.update(copy.deepcopy(dict(method_state)))
-    model.G=g
-    return model
+
 
 
 
@@ -44,6 +12,10 @@ from .operations_on_logarithmic_values import logmean, logminus, logplus
 from .support_functions.WgtEvd import _mmin
 from .support_functions.logGauss import logGauss
 
+
+from .SeMCS import prescribed_state
+from ._utils import mround
+from .support_functions.DspRst import DspRst
 
 class SuS_Bay_Nataf:
     @property
@@ -77,7 +49,6 @@ class SuS_Bay_Nataf:
             spec["kernels"]["aCS"].update(Sigma0Mode="seed_std",CarryLambda=False,
                 Lambda=.6,AcpOpt=.44,NumIte=5,SedSav=False,
                 AcceptArithmetic="exp",GroupMode="fixed",AcceptanceRateMode="attempts")
-            spec["state"]={"lifecycle":{"InitialSampling":"sampler"}}
         return spec
 
     def __init__(self, LKF, *, method_profile="author_latest"):
@@ -89,7 +60,8 @@ class SuS_Bay_Nataf:
         self.Y = None
         self.G = {"parameters": np.array([-np.inf, 0, -np.inf, 0, -np.inf, -np.inf, -np.inf]), "lambda": 0.6, "L": np.eye(self.Ndim), "p": 0.1, "Nsam": 1000,
                   "threshold_tol": 1e-1, "evidence_tol": 1e-1}
-        configure_method_profile(self,"sus_bayes",method_profile)
+        self.MethodProfile=method_profile
+        self.sampler_profile_spec(method_profile)
 
     def EvlY(self, u):
         """Evaluate [log-likelihood; log-prior] at samples u [Ndim x Nsam]."""
@@ -193,5 +165,72 @@ class SuS_Bay_Nataf:
     def U2X(self, u):
         """Standard normal -> physical space via the Nataf transformation."""
         return self.LKF.Pdis.U2X(u)
+
+    def run_defaults(self):
+        return dict(Verbose=True)
+
+    def start_run(self,owner,sampler):
+        owner.IntBay.G=dict(owner.IntBay.G,p=owner.ConPrb)
+        sampler=copy.copy(sampler); model=owner.IntBay
+        counts=np.atleast_1d(owner.NumSam)
+        limit=owner.MaxIte
+        # Preserve the historical max-iteration and schedule conventions.
+        ns=np.zeros(limit+1,dtype=int)
+        if counts.size>1: ns[:counts.size]=counts
+        else: ns[:]=counts[0]
+        schedule=[copy.deepcopy(v) if isinstance(v,dict) else
+                  dict(parameters=np.asarray(v).copy(), **{"lambda":0.6})
+                  for v in owner.G]
+        if len(schedule):
+            model=copy.copy(model)
+            model.G=prescribed_state(model.G,schedule[0],initial=True)
+            sampler.BayStc=model
+        return dict(owner=owner,model=model,sampler=sampler,limit=limit,
+                    targets=ns,schedule=schedule,nc=int(ns[0]),steps=1,
+                    xseed=None,yseed=None,x=[],y=[],g=[copy.deepcopy(model.G)],
+                    Nsam=[],Nsze=[],Ncal=[],complete=False)
+
+    def sample_level(self,c,level):
+        if level==0:
+            x,y,calls,model=c["sampler"].SamGen(c["nc"],c["steps"])
+        else:
+            x,y,calls,model=c["sampler"].SamGen(c["xseed"],c["yseed"],c["steps"])
+        c["model"]=model
+        record=dict(x=x,y=y,calls=calls,count=c["nc"]*c["steps"],shape=(c["nc"],c["steps"]))
+        c["x"].append(x);c["y"].append(y);c["Ncal"].append(calls)
+        c["Nsam"].append(record["count"]);c["Nsze"].append(record["shape"])
+        return record
+
+    def advance_level(self,c,r,level):
+        model=c["model"]
+        if level+1<len(c["schedule"]):
+            model=copy.copy(model)
+            model.G=prescribed_state(model.G,c["schedule"][level+1])
+        else:
+            _,model=model.UpdObj(r["y"],c["owner"].ConPrb)
+        c["model"]=model;c["sampler"].BayStc=model
+        c["g"].append(copy.deepcopy(model.G))
+
+    def select_run_seeds(self,c,r,level):
+        target=int(c["targets"][level+1])
+        xs,ys=c["model"].SltSed(r["x"],r["y"],target)
+        c["xseed"],c["yseed"]=xs,ys
+        c["nc"]=xs.shape[1]
+        c["steps"]=mround(target/c["nc"]) if c["nc"] else np.inf
+        if c["owner"].Verbose: DspRst(level+1,r["count"],np.asarray(r["shape"]),r["calls"])
+
+    def run_complete(self,c,r,phase):
+        if phase!="after_seeds": return False
+        if c["nc"]<=0 or len(c["x"])+1==c["limit"]: return True
+        c["complete"]=bool(c["model"].FlgCvg)
+        return c["complete"]
+
+    def finish_run(self,c):
+        return dict(x=c["x"],y=c["y"],g=c["g"],Nsam=np.asarray(c["Nsam"]),
+                    Nsze=np.asarray(c["Nsze"],dtype=int),Ncal=np.asarray(c["Ncal"]),
+                    Nite=len(c["x"]),flg_cvg=c["complete"],intBay=c["model"])
+
+    def sampler_options(self, kernel):
+        return copy.deepcopy(self.sampler_profile_spec(self.MethodProfile)["kernels"].get(kernel,{}))
 
 

@@ -57,6 +57,8 @@ pip install -r requirements.txt
 
 ## Repository structure
 
+Every toolbox includes the same `SeMCS(sampler).RunIte()` loop. Method classes own initialization, intermediate updates, seed selection and convergence. Fixed MCMC options are sampler attributes; evolving proposal scales and trajectory times are stored in the model's `G`. Each repository runs independently.
+
 ```text
 ├── LICENSE
 ├── README.md
@@ -75,7 +77,7 @@ pip install -r requirements.txt
     │   ├── LKF_nD_GaussianLogGamma.py
     │   ├── LKF_nD_GaussianShells.py
     │   └── __init__.py
-    ├── main.py
+    ├── SeMCS.py
     ├── mcmc_samplers/
     │   ├── CW_aMH.py
     │   ├── ES.py
@@ -114,11 +116,11 @@ Both drivers use 1000 samples per level. `drive_evidence.py` runs 500 repetition
 The same steps from Python code:
 
 ```python
-from sus_bayes import LKF_nD_GaussianShells, SuS_Bay_Nataf, aCS, Main, NumSim
+from sus_bayes import LKF_nD_GaussianShells, SuS_Bay_Nataf, aCS, SeMCS, NumSim
 
 Tfun = LKF_nD_GaussianShells(5)
 IntBay = SuS_Bay_Nataf(Tfun)
-ss = Main(aCS(IntBay))
+ss = SeMCS(aCS(IntBay))
 ss.NumSam = 1000
 
 out_ss = ss.RunIte()           # one subset simulation run
@@ -187,7 +189,7 @@ The post-processing object `out_ps = NumSim(out_ss)` provides both outputs from 
 - **Evidence:** `out_ps.Z` is $\log \widehat{Z}$, the natural logarithm of the evidence estimate, despite the property name `Z`. `np.exp(out_ps.Z)` converts it to $\widehat{Z}$ when representable; keeping the log value avoids underflow or overflow.
 - **Posterior samples:** `x_pos = out_ps.PosSim()[0]` returns samples in standard normal space. `theta_pos = Tfun.Pdis.U2X(x_pos)` maps them to the physical parameter space, with one posterior sample per column.
 
-During each run, the progress of every level is printed (sample size, number of chains, samples per chain, likelihood evaluations); set `ss.Verbose = False` to silence it. `Main.RunIte()` returns a dictionary with the samples `x`, function values `y` and level parameters `g` of every level, and the drivers print and keep the following:
+During each run, the progress of every level is printed (sample size, number of chains, samples per chain, likelihood evaluations); set `ss.Verbose = False` to silence it. `SeMCS.RunIte()` returns a dictionary with the samples `x`, function values `y` and level parameters `g` of every level, and the drivers print and keep the following:
 
 **`drive_evidence.py`**
 
@@ -211,7 +213,7 @@ Signed-log arithmetic retains an inherited limitation: an all-negative signed-lo
 
 ## Differences from the MATLAB version
 
-- The MATLAB class `main` is called `Main` (`main` is kept as an alias), and `RunIte` returns a dictionary instead of a struct.
+- The iteration class is `SeMCS` in both languages, and `RunIte` returns a dictionary instead of a struct.
 - Arrays keep the MATLAB layout (`Ndim × Nc × Ns`, flattened in column-major order), so indices printed by the two versions agree; Python indices start at 0.
 - Random numbers are drawn through `sus_bayes._utils` (`randn`, `rand`, `randperm`, `randi`, `randsample`), backed by NumPy; `np.random.seed` fixes a run.
 - Frozen wrappers such as `Distribution("Normal", scipy.stats.norm(...))` need not expose `mu`/`sigma` attributes: they use their generic `icdf` mapping. Parameterized `makedist` Normal/Lognormal objects retain direct transforms to avoid CDF saturation in extreme tails.

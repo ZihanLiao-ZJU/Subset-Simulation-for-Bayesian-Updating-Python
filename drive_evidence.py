@@ -12,7 +12,7 @@ import numpy as np
 from sus_bayes.mcmc_samplers import CW_aMH, aCS, HMC, ES
 
 from sus_bayes import (LKF_2D_Eggbox, LKF_nD_GaussianLogGamma, LKF_nD_GaussianShells,  # noqa: F401
-                       Main, NumSim, SuS_Bay_Nataf, aCS)
+                       SeMCS, NumSim, SuS_Bay_Nataf, aCS)
 
 parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("--nrun", type=int, default=500, help="number of repeated runs (default 500)")
@@ -39,7 +39,7 @@ Tfun = LKF_nD_GaussianShells(Ndim)       # multimodal shell-shaped posterior
 # ----------------------------------------------------------------------
 IntBay = SuS_Bay_Nataf(Tfun)     # Bayesian model with Nataf transformation
 sampler = SamplerClass(IntBay)            # adaptive MCMC sampler
-ss = Main(sampler)               # main subset simulation object
+ss = SeMCS(sampler)               # main subset simulation object
 ss.NumSam = Nsam                 # sample size per level
 # ----------------------------------------------------------------------
 

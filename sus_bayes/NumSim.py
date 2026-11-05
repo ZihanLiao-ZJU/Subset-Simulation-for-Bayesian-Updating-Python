@@ -15,7 +15,7 @@ from .support_functions.WgtPos import WgtPos
 class NumSim:
     """Numerical post-processing of subset simulation samples.
 
-    obj = NumSim(out)                      # out: output of Main.RunIte
+    obj = NumSim(out)                      # out: output of SeMCS.RunIte
     x_pos, y_pos, x_all, y_all = obj.PosSim()
     cv_z_hat, cv_z = obj.EvlVar()
 
