@@ -54,14 +54,38 @@ class SeMCS:
             sampler.rng = rng
         context = self.IntBay.start_run(self, sampler)
 
-        # Keep each method's own seed-selection and stopping order.
         for level in range(context["limit"]):
-            record = context["model"].sample_level(context, level)
+            # SamGen: sample the initial or current intermediate distribution.
+            if hasattr(context["model"], "sample_level"):
+                record = context["model"].sample_level(context, level)
+            else:
+                if level == 0:
+                    x, y, calls, model = context["sampler"].SamGen(context["nc"], context["steps"])
+                else:
+                    x, y, calls, model = context["sampler"].SamGen(
+                        context["xseed"], context["yseed"], context["steps"]
+                    )
+                context["model"] = model
+                record = dict(
+                    x=x,
+                    y=y,
+                    calls=calls,
+                    count=context["nc"] * context["steps"],
+                    shape=(context["nc"], context["steps"]),
+                )
+                context["x"].append(x)
+                context["y"].append(y)
+                context["Ncal"].append(calls)
+                context["Nsam"].append(record["count"])
+                context["Nsze"].append(record["shape"])
+
+            # UpdObj/update: evolve the method's intermediate distribution.
             context["model"].advance_level(context, record, level)
 
             if context["model"].run_complete(context, record, "before_seeds"):
                 break
 
+            # SltSed/SedSlt: keep each method's own seed-selection strategy.
             context["model"].select_run_seeds(context, record, level)
             if context["model"].run_complete(context, record, "after_seeds"):
                 break

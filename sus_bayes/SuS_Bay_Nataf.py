@@ -227,28 +227,6 @@ class SuS_Bay_Nataf:
             complete=False,
         )
 
-    def sample_level(self, context, level):
-        if level == 0:
-            x, y, calls, model = context["sampler"].SamGen(context["nc"], context["steps"])
-        else:
-            x, y, calls, model = context["sampler"].SamGen(
-                context["xseed"], context["yseed"], context["steps"]
-            )
-        context["model"] = model
-        record = dict(
-            x=x,
-            y=y,
-            calls=calls,
-            count=context["nc"] * context["steps"],
-            shape=(context["nc"], context["steps"]),
-        )
-        context["x"].append(x)
-        context["y"].append(y)
-        context["Ncal"].append(calls)
-        context["Nsam"].append(record["count"])
-        context["Nsze"].append(record["shape"])
-        return record
-
     def advance_level(self, context, record, level):
         model = context["model"]
         if level + 1 < len(context["schedule"]):
