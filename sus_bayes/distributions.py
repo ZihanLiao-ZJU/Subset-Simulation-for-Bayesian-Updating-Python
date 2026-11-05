@@ -73,18 +73,29 @@ def makedist(name, **p):
         return Distribution("Normal", stats.norm(loc=mu, scale=sigma), mu=mu, sigma=sigma)
     if key == "lognormal":
         mu, sigma = p.get("mu", 0.0), p.get("sigma", 1.0)
-        return Distribution("Lognormal", stats.lognorm(s=sigma, scale=np.exp(mu)), mu=mu, sigma=sigma)
+        return Distribution(
+            "Lognormal", stats.lognorm(s=sigma, scale=np.exp(mu)), mu=mu, sigma=sigma
+        )
     if key == "uniform":
         lower, upper = p.get("lower", 0.0), p.get("upper", 1.0)
-        return Distribution("Uniform", stats.uniform(loc=lower, scale=upper - lower), lower=lower, upper=upper)
+        return Distribution(
+            "Uniform", stats.uniform(loc=lower, scale=upper - lower), lower=lower, upper=upper
+        )
     if key == "generalizedextremevalue":
         k, sigma, mu = p.get("k", 0.0), p.get("sigma", 1.0), p.get("mu", 0.0)
         # MATLAB shape k corresponds to scipy's c = -k
-        return Distribution("Generalized Extreme Value", stats.genextreme(c=-k, loc=mu, scale=sigma),
-                            k=k, sigma=sigma, mu=mu)
+        return Distribution(
+            "Generalized Extreme Value",
+            stats.genextreme(c=-k, loc=mu, scale=sigma),
+            k=k,
+            sigma=sigma,
+            mu=mu,
+        )
     if key == "extremevalue":
         mu, sigma = p.get("mu", 0.0), p.get("sigma", 1.0)
-        return Distribution("Extreme Value", stats.gumbel_l(loc=mu, scale=sigma), mu=mu, sigma=sigma)
+        return Distribution(
+            "Extreme Value", stats.gumbel_l(loc=mu, scale=sigma), mu=mu, sigma=sigma
+        )
     if key == "gamma":
         a, b = p.get("a", 1.0), p.get("b", 1.0)
         return Distribution("Gamma", stats.gamma(a, scale=b), a=a, b=b)

@@ -34,21 +34,38 @@ class LKF_nD_GaussianLogGamma:
         sd = 1.0
         t1, t2 = theta[0], theta[1]
         with np.errstate(over="ignore", invalid="ignore"):
-            Log_g_a = alpha * (t1 - c_a) - np.exp(t1 - c_a) / beta - gammaln(alpha) - alpha * np.log(beta)
-            Log_g_b = alpha * (t1 - c_b) - np.exp(t1 - c_b) / beta - gammaln(alpha) - alpha * np.log(beta)
+            Log_g_a = (
+                alpha * (t1 - c_a) - np.exp(t1 - c_a) / beta - gammaln(alpha) - alpha * np.log(beta)
+            )
+            Log_g_b = (
+                alpha * (t1 - c_b) - np.exp(t1 - c_b) / beta - gammaln(alpha) - alpha * np.log(beta)
+            )
             Log_g_ab = np.maximum(Log_g_a, Log_g_b)
             Log_n_c = -0.5 * ((t2 - mu_c) / sd) ** 2 - np.log(np.sqrt(2 * np.pi)) - np.log(sd)
             Log_n_d = -0.5 * ((t2 - mu_d) / sd) ** 2 - np.log(np.sqrt(2 * np.pi)) - np.log(sd)
             Log_n_cd = np.maximum(Log_n_c, Log_n_d)
 
-            logL = (np.log(0.5) + Log_g_ab + np.log(np.exp(Log_g_a - Log_g_ab) + np.exp(Log_g_b - Log_g_ab))
-                    + np.log(0.5) + Log_n_cd + np.log(np.exp(Log_n_c - Log_n_cd) + np.exp(Log_n_d - Log_n_cd)))
+            logL = (
+                np.log(0.5)
+                + Log_g_ab
+                + np.log(np.exp(Log_g_a - Log_g_ab) + np.exp(Log_g_b - Log_g_ab))
+                + np.log(0.5)
+                + Log_n_cd
+                + np.log(np.exp(Log_n_c - Log_n_cd) + np.exp(Log_n_d - Log_n_cd))
+            )
 
             # Gaussian or LogGamma for the other dimensions (i is 1-based as in MATLAB)
             for i in range(3, ndim + 1):
                 ti = theta[i - 1]
                 if i <= (ndim + 2) / 2:
-                    logL = logL + (alpha * (ti - c_a) - np.exp(ti - c_a) / beta - gammaln(alpha) - alpha * np.log(beta))
+                    logL = logL + (
+                        alpha * (ti - c_a)
+                        - np.exp(ti - c_a) / beta
+                        - gammaln(alpha)
+                        - alpha * np.log(beta)
+                    )
                 else:
-                    logL = logL + (-0.5 * ((ti - mu_c) / sd) ** 2 - np.log(np.sqrt(2 * np.pi)) - np.log(sd))
+                    logL = logL + (
+                        -0.5 * ((ti - mu_c) / sd) ** 2 - np.log(np.sqrt(2 * np.pi)) - np.log(sd)
+                    )
         return logL

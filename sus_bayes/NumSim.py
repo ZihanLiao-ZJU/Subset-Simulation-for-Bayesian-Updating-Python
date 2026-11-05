@@ -89,19 +89,29 @@ class NumSim:
         z_i, z = self.Zi, self.Z
         Nite = self.NumIte
 
-        c_p_hat = np.zeros(Nite); c_p = np.zeros(Nite); gamma_p = np.zeros(Nite)
+        c_p_hat = np.zeros(Nite)
+        c_p = np.zeros(Nite)
+        gamma_p = np.zeros(Nite)
         for ite in range(Nite - 1):
             c_p_hat[ite], c_p[ite], gamma_p[ite] = CorMod(w_res[ite])
 
-        c_h_hat = np.zeros(Nite); c_h = np.zeros(Nite); gamma_h = np.zeros(Nite)
+        c_h_hat = np.zeros(Nite)
+        c_h = np.zeros(Nite)
+        gamma_h = np.zeros(Nite)
         for ite in range(Nite):
             c_h_hat[ite], c_h[ite], gamma_h[ite] = CorMod(w_evd[ite])
 
-        rho_hp = np.zeros(max(Nite - 1, 0)); rho_fi = np.zeros(max(Nite - 1, 0))
+        rho_hp = np.zeros(max(Nite - 1, 0))
+        rho_fi = np.zeros(max(Nite - 1, 0))
         gamma_hp = np.zeros(max(Nite - 1, 0))
         for ite in range(Nite - 1):
             rho_fi[ite], gamma_hp[ite] = CorMod_cross(w_evd[ite], w_res[ite])
-            rho_hp[ite] = rho_fi[ite] * (1 + gamma_hp[ite]) / np.sqrt(1 + gamma_p[ite]) / np.sqrt(1 + gamma_h[ite])
+            rho_hp[ite] = (
+                rho_fi[ite]
+                * (1 + gamma_hp[ite])
+                / np.sqrt(1 + gamma_p[ite])
+                / np.sqrt(1 + gamma_h[ite])
+            )
 
         cov_z_hat = np.zeros((Nite, Nite))
         cov_z = np.zeros((Nite, Nite))
@@ -115,11 +125,11 @@ class NumSim:
                 if ite < Nite - 1:
                     cpch_hat = c_p_hat[ite] * c_h_hat[ite] * rho_hp[ite]
                     cpch = c_p[ite] * c_h[ite] * rho_fi[ite]
-                    z1z2 = z_i[ite] + z_i[ite + 1:]
-                    cov_z_hat[ite, ite + 1:] = z1z2 + np.log(sumcp_hat + cpch_hat)
-                    cov_z[ite, ite + 1:] = z1z2 + np.log(sumcp + cpch)
-                    cov_z_hat[ite + 1:, ite] = cov_z_hat[ite, ite + 1:]
-                    cov_z[ite + 1:, ite] = cov_z[ite, ite + 1:]
+                    z1z2 = z_i[ite] + z_i[ite + 1 :]
+                    cov_z_hat[ite, ite + 1 :] = z1z2 + np.log(sumcp_hat + cpch_hat)
+                    cov_z[ite, ite + 1 :] = z1z2 + np.log(sumcp + cpch)
+                    cov_z_hat[ite + 1 :, ite] = cov_z_hat[ite, ite + 1 :]
+                    cov_z[ite + 1 :, ite] = cov_z[ite, ite + 1 :]
         cov_z_hat[np.isnan(cov_z_hat)] = -np.inf
 
         cv_z_hat = float(np.real(np.exp(logsum(cov_z_hat, None) / 2 - z)))

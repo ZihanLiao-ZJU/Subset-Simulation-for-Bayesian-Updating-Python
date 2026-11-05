@@ -31,7 +31,9 @@ class LKF_nD_GaussianShells:
         c[0, 0], c[0, 1] = 3.5, -3.5
         r = 2.0
         omega = 0.1
-        X = -((np.sqrt(np.sum((theta - c[:, [0]]) ** 2, 0)) - r) ** 2) / (2 * omega ** 2)
-        Y = -((np.sqrt(np.sum((theta - c[:, [1]]) ** 2, 0)) - r) ** 2) / (2 * omega ** 2)
+        X = -((np.sqrt(np.sum((theta - c[:, [0]]) ** 2, 0)) - r) ** 2) / (2 * omega**2)
+        Y = -((np.sqrt(np.sum((theta - c[:, [1]]) ** 2, 0)) - r) ** 2) / (2 * omega**2)
         XY = np.maximum(X, Y)
-        return np.log(1 / np.sqrt(2 * np.pi * omega ** 2)) + XY + np.log(np.exp(X - XY) + np.exp(Y - XY))
+        return (
+            np.log(1 / np.sqrt(2 * np.pi * omega**2)) + XY + np.log(np.exp(X - XY) + np.exp(Y - XY))
+        )
