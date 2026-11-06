@@ -6,7 +6,6 @@ from ._utils import flat, mround, randi, randperm
 from .operations_on_logarithmic_values import logmean, logminus, logplus
 from .support_functions.WgtEvd import _mmin
 from .support_functions.logGauss import logGauss
-from .support_functions.DspRst import DspRst
 
 
 class SuS_Bay_Nataf:
@@ -96,7 +95,7 @@ class SuS_Bay_Nataf:
         obj.G = {**obj.G, "parameters": g}
         return y, obj.G, obj, 0
 
-    def SltSed(self, u, y, Nsam):
+    def SedSlt(self, u, y, Nsam, rng=None):
         """Select seed samples for the next iteration."""
         u = flat(u)[:self.Ndim, :]
         y = flat(y)[:self.Nfun, :]
@@ -167,8 +166,4 @@ class SuS_Bay_Nataf:
             )
         return options.get(kernel, {})
 
-    RunOptions = dict(
-        Defaults=dict(Verbose=True), CountPolicy="padded", LoopOffset=0,
-        PresetMode="protected_lambda",
-        SeedFunction=SltSed, OutputFields=(), DisplayFunction=DspRst,
-    )
+    Verbose = True
