@@ -13,7 +13,6 @@ from .support_functions.WgtEvd import _mmin
 from .support_functions.logGauss import logGauss
 
 
-from .SeMCS import prescribed_state
 from ._utils import mround
 from .support_functions.DspRst import DspRst
 
@@ -36,7 +35,6 @@ class SuS_Bay_Nataf:
         G    : parameters of the intermediate likelihood function
                [L_i, p_i, L_i1, p_i1, z_i1, z_tmp1, z_sum1]
     """
-
 
     def sampler_profile_spec(self, method_profile="author_latest"):
         """Sampling options for the supported source and paper settings."""
@@ -96,7 +94,6 @@ class SuS_Bay_Nataf:
             return np.zeros_like(L)
         with np.errstate(divide="ignore"):
             return np.log((L > L_i).astype(float))
-
 
     def EvlPDF(self):
         """Intermediate prior (log prior)."""
@@ -180,95 +177,12 @@ class SuS_Bay_Nataf:
         """Standard normal -> physical space via the Nataf transformation."""
         return self.LKF.Pdis.U2X(u)
 
-    def run_defaults(self):
-        return dict(Verbose=True)
-
-    def start_run(self, owner, sampler):
-        owner.IntBay.G = dict(owner.IntBay.G, p=owner.ConPrb)
-        sampler = copy.copy(sampler)
-        model = owner.IntBay
-        counts = np.atleast_1d(owner.NumSam)
-        limit = owner.MaxIte
-        # Preserve the historical max-iteration and schedule conventions.
-        ns = np.zeros(limit + 1, dtype=int)
-        if counts.size > 1:
-            ns[: counts.size] = counts
-        else:
-            ns[:] = counts[0]
-        schedule = [
-            (
-                copy.deepcopy(v)
-                if isinstance(v, dict)
-                else dict(parameters=np.asarray(v).copy(), **{"lambda": 0.6})
-            )
-            for v in owner.G
-        ]
-        if len(schedule):
-            model = copy.copy(model)
-            model.G = prescribed_state(model.G, schedule[0], initial=True)
-            sampler.BayStc = model
-        return dict(
-            owner=owner,
-            model=model,
-            sampler=sampler,
-            limit=limit,
-            targets=ns,
-            schedule=schedule,
-            nc=int(ns[0]),
-            steps=1,
-            xseed=None,
-            yseed=None,
-            x=[],
-            y=[],
-            g=[copy.deepcopy(model.G)],
-            Nsam=[],
-            Nsze=[],
-            Ncal=[],
-            complete=False,
-        )
-
-    def advance_level(self, context, record, level):
-        model = context["model"]
-        if level + 1 < len(context["schedule"]):
-            model = copy.copy(model)
-            model.G = prescribed_state(model.G, context["schedule"][level + 1])
-        else:
-            _, model = model.UpdObj(record["y"], context["owner"].ConPrb)
-        context["model"] = model
-        context["sampler"].BayStc = model
-        context["g"].append(copy.deepcopy(model.G))
-
-    def select_run_seeds(self, context, record, level):
-        target = int(context["targets"][level + 1])
-        xs, ys = context["model"].SltSed(record["x"], record["y"], target)
-        context["xseed"], context["yseed"] = xs, ys
-        context["nc"] = xs.shape[1]
-        context["steps"] = mround(target / context["nc"]) if context["nc"] else np.inf
-        if context["owner"].Verbose:
-            DspRst(level + 1, record["count"], np.asarray(record["shape"]), record["calls"])
-
-    def run_complete(self, context, record, phase):
-        if phase != "after_seeds":
-            return False
-        if context["nc"] <= 0 or len(context["x"]) + 1 == context["limit"]:
-            return True
-        context["complete"] = bool(context["model"].FlgCvg)
-        return context["complete"]
-
-    def finish_run(self, context):
-        return dict(
-            x=context["x"],
-            y=context["y"],
-            g=context["g"],
-            Nsam=np.asarray(context["Nsam"]),
-            Nsze=np.asarray(context["Nsze"], dtype=int),
-            Ncal=np.asarray(context["Ncal"]),
-            Nite=len(context["x"]),
-            flg_cvg=context["complete"],
-            intBay=context["model"],
-        )
-
     def sampler_options(self, kernel):
         return copy.deepcopy(self.sampler_profile_spec(self.MethodProfile)["kernels"].get(kernel, {}))
 
+    RunOptions = dict(
+        Defaults=dict(Verbose=True), CountPolicy="padded", LoopOffset=0,
+        PresetMode="protected_lambda", UpdateOutputs=2,
+        SeedFunction=SltSed, OutputFields=(), DisplayFunction=DspRst,
+    )
 
