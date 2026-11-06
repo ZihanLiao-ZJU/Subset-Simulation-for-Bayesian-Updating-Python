@@ -49,8 +49,6 @@ class SeMCS:
         model.G["p"] = self.ConPrb
         if len(self.G):
             model.G = prescribed_state(model.G, self.G[0], initial=True)
-        if hasattr(model, "start_run"):
-            model, sampler = model.start_run(sampler)
         sampler.BayStc = model
 
         x_history, y_history = [], []
@@ -62,17 +60,11 @@ class SeMCS:
 
         for level in range(limit):
             # 1. Generate samples; retain the sampler's chain and step axes.
-            if hasattr(model, "sample_level"):
-                x, y, calls, model, shape = model.sample_level(
-                    sampler, int(targets[level] if targets.size > 1 else targets[0]),
-                    xseed, yseed, steps, level
-                )
+            if level == 0:
+                x, y, calls, model = sampler.SamGen(nc, steps)
             else:
-                if level == 0:
-                    x, y, calls, model = sampler.SamGen(nc, steps)
-                else:
-                    x, y, calls, model = sampler.SamGen(xseed, yseed, steps)
-                shape = (nc, steps)
+                x, y, calls, model = sampler.SamGen(xseed, yseed, steps)
+            shape = (nc, steps)
             g_history[-1] = copy.deepcopy(model.G)
             x_history.append(x)
             y_history.append(y)
@@ -80,47 +72,30 @@ class SeMCS:
             chain_shapes.append(shape)
             call_counts.append(calls)
 
-            # 2. ReSuS updates a candidate domain before choosing its seeds.
-            if hasattr(model, "update"):
-                if level + 1 < len(self.G):
-                    next_model = copy.copy(model)
-                    next_model.G = prescribed_state(model.G, self.G[level + 1])
-                else:
-                    values = y.reshape(y.shape[0], -1, order="F")
-                    next_model = model.update(values[3], values[2], model.G["p"])
-                g_history.append(copy.deepcopy(next_model.G))
-                complete = bool(next_model.converged())
-                if complete or level + 1 == limit:
-                    break
-                target = int(targets[level + 1] if targets.size > 1 else targets[0])
-                xseed, yseed, steps, model = next_model.select_run_seeds(
-                    x, y, target, sampler.rng, model
-                )
-                g_history[-1] = copy.deepcopy(model.G)
+            # 2. Update the intermediate distribution and cached sample values.
+            if level + 1 < len(self.G):
+                model.G = prescribed_state(model.G, self.G[level + 1])
             else:
-                if level + 1 < len(self.G):
-                    model.G = prescribed_state(model.G, self.G[level + 1])
-                else:
-                    y, _, model, extra = model.UpdObj(x, y, model.G["p"])
-                    y_history[-1] = y
-                    call_counts[-1] += extra
-                g_history.append(copy.deepcopy(model.G))
-                sampler.BayStc = model
-                if level + 1 == limit:
-                    complete = bool(model.FlgCvg)
-                    break
-
-                # 3. Each ordinary model owns its actual SedSlt rule.
-                target = int(targets[level + 1] if targets.size > 1 else targets[0])
-                xseed, yseed = model.SedSlt(x, y, target, sampler.rng)
-                nc = xseed.shape[1]
-                steps = int(np.floor(target / nc + 0.5)) if nc else 0
-                if self.Verbose:
-                    print(f"level {level+1}: samples={sample_counts[-1]}, evaluations={call_counts[-1]}")
-                # Evaluate the native criterion after its original seed operation.
+                y, _, model, extra = model.UpdObj(x, y, model.G["p"])
+                y_history[-1] = y
+                call_counts[-1] += extra
+            g_history.append(copy.deepcopy(model.G))
+            sampler.BayStc = model
+            if level + 1 == limit or (getattr(model, "StopBeforeSeeds", False) and model.FlgCvg):
                 complete = bool(model.FlgCvg)
-                if complete or nc <= 0:
-                    break
+                break
+
+            # 3. Each model owns its actual SedSlt rule.
+            target = int(targets[level + 1] if targets.size > 1 else targets[0])
+            xseed, yseed = model.SedSlt(x, y, target, sampler.rng)
+            nc = xseed.shape[1]
+            steps = int(np.floor(target / nc + 0.5)) if nc else 0
+            if self.Verbose:
+                print(f"level {level+1}: samples={sample_counts[-1]}, evaluations={call_counts[-1]}")
+            # Evaluate the native criterion after its original seed operation.
+            complete = bool(model.FlgCvg)
+            if complete or nc <= 0:
+                break
             sampler.BayStc = model
 
         return dict(

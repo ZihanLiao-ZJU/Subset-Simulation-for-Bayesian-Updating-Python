@@ -76,7 +76,7 @@ class MCMCBase:
                 u = np.asarray(b.sample_reference(nc, self.rng), dtype=float)
             else:
                 u = (
-                    np.asarray(b.SamGen(nc), dtype=float)
+                    np.asarray(b.SamGen(nc, rng=self.rng), dtype=float)
                     if hasattr(b, "SamGen")
                     else L @ self._randn(d, nc)
                 )
