@@ -1,29 +1,15 @@
-"""Subset simulation method and native Bayesian lifecycle."""
+"""Subset simulation ISD for Bayesian evidence estimation."""
+
 import copy
-
-
-
-
-
 import numpy as np
-
 from ._utils import flat, mround, randi, randperm
 from .operations_on_logarithmic_values import logmean, logminus, logplus
 from .support_functions.WgtEvd import _mmin
 from .support_functions.logGauss import logGauss
-
-
-from ._utils import mround
 from .support_functions.DspRst import DspRst
 
-class SuS_Bay_Nataf:
-    @property
-    def Nsam(self):
-        return self.G.get("Nsam", 1000)
 
-    @Nsam.setter
-    def Nsam(self, value):
-        self.G = dict(self.G, Nsam=value)
+class SuS_Bay_Nataf:
     """Subset simulation with Nataf transformation for Bayesian updating.
 
     Properties
@@ -36,32 +22,13 @@ class SuS_Bay_Nataf:
                [L_i, p_i, L_i1, p_i1, z_i1, z_tmp1, z_sum1]
     """
 
-    def sampler_profile_spec(self, method_profile="author_latest"):
-        """Sampling options for the supported source and paper settings."""
-        if method_profile not in {"author_latest", "paper"}:
-            raise ValueError("Unknown method profile: " + str(method_profile))
-        spec = {
-            "family": "sus_bayes",
-            "name": method_profile,
-            "default_kernel": "aCS",
-            "kernels": {
-                "aCS": {"Sigma0Mode": "seed_std", "CarryLambda": False},
-                "ES": {"ESMode": "coordinate"},
-            },
-        }
-        if method_profile == "author_latest":
-            spec["kernels"]["aCS"].update(
-                Sigma0Mode="seed_std",
-                CarryLambda=False,
-                Lambda=0.6,
-                AcpOpt=0.44,
-                NumIte=5,
-                SedSav=False,
-                AcceptArithmetic="exp",
-                GroupMode="fixed",
-                AcceptanceRateMode="attempts",
-            )
-        return spec
+    @property
+    def Nsam(self):
+        return self.G.get("Nsam", 1000)
+
+    @Nsam.setter
+    def Nsam(self, value):
+        self.G = dict(self.G, Nsam=value)
 
     def __init__(self, LKF, *, method_profile="author_latest"):
         self.LKF = LKF
@@ -72,8 +39,9 @@ class SuS_Bay_Nataf:
         self.Y = None
         self.G = {"parameters": np.array([-np.inf, 0, -np.inf, 0, -np.inf, -np.inf, -np.inf]), "lambda": 0.6, "L": np.eye(self.Ndim), "p": 0.1, "Nsam": 1000,
                   "threshold_tol": 1e-1, "evidence_tol": 1e-1}
-        self.MethodProfile=method_profile
-        self.sampler_profile_spec(method_profile)
+        self.MethodProfile = method_profile
+        if method_profile not in {"author_latest", "paper"}:
+            raise ValueError("Unknown method profile: " + str(method_profile))
 
     def EvlY(self, u):
         """Evaluate [log-likelihood; log-prior] at samples u [Ndim x Nsam]."""
@@ -99,11 +67,11 @@ class SuS_Bay_Nataf:
         """Intermediate prior (log prior)."""
         return self.Y[1, :]
 
-    def UpdObj(self, y, p):
+    def UpdObj(self, x, y, p):
         """Update the parameters of the intermediate distributions.
 
         y : function values [4 x Nc x Ns];  p : target conditional probability
-        Returns (g, obj).
+        Returns (y, G, obj, extra_calls); cached y is unchanged.
         """
         obj = copy.copy(self)
         g = obj.G["parameters"]
@@ -126,7 +94,7 @@ class SuS_Bay_Nataf:
 
         g = np.array([L_i, p_i, L_i1, p_i1, z_i1, z_tmp1, z_sum1], dtype=float)
         obj.G = {**obj.G, "parameters": g}
-        return obj.G, obj
+        return y, obj.G, obj, 0
 
     def SltSed(self, u, y, Nsam):
         """Select seed samples for the next iteration."""
@@ -178,11 +146,29 @@ class SuS_Bay_Nataf:
         return self.LKF.Pdis.U2X(u)
 
     def sampler_options(self, kernel):
-        return copy.deepcopy(self.sampler_profile_spec(self.MethodProfile)["kernels"].get(kernel, {}))
+        """Fixed paper/source options used once when a sampler is constructed."""
+        if self.MethodProfile not in {"author_latest", "paper"}:
+            raise ValueError("Unknown method profile: " + str(self.MethodProfile))
+        options = {
+            "aCS": {"Sigma0Mode": "seed_std", "CarryLambda": False},
+            "ES": {"ESMode": "coordinate"},
+        }
+        if self.MethodProfile == "author_latest":
+            options["aCS"].update(
+                Sigma0Mode="seed_std",
+                CarryLambda=False,
+                Lambda=0.6,
+                AcpOpt=0.44,
+                NumIte=5,
+                SedSav=False,
+                AcceptArithmetic="exp",
+                GroupMode="fixed",
+                AcceptanceRateMode="attempts",
+            )
+        return options.get(kernel, {})
 
     RunOptions = dict(
         Defaults=dict(Verbose=True), CountPolicy="padded", LoopOffset=0,
-        PresetMode="protected_lambda", UpdateOutputs=2,
+        PresetMode="protected_lambda",
         SeedFunction=SltSed, OutputFields=(), DisplayFunction=DspRst,
     )
-

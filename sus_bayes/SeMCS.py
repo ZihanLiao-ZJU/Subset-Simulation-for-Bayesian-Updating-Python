@@ -4,18 +4,6 @@ import copy
 import numpy as np
 
 
-def state_property(name, default=None):
-    """Expose a model parameter stored in its evolving G state."""
-
-    def get(self):
-        return self.G.get(name, default)
-
-    def set_(self, value):
-        self.G = dict(getattr(self, "G", {}), **{name: value})
-
-    return property(get, set_)
-
-
 def prescribed_state(current, specified, *, initial=False):
     """Apply a prescribed intermediate state without resetting live adaptation."""
     requested = copy.deepcopy(specified)
@@ -55,7 +43,6 @@ class SeMCS:
             PostCapOffset=1,
             StopPhase="after_seeds",
             PresetMode="protected",
-            UpdateOutputs=4,
             SeedInputs="model",
             StateHistory="transition",
             Layout="raw",
@@ -71,14 +58,17 @@ class SeMCS:
         if rng is not None:
             sampler.rng = rng
         if hasattr(self.IntBay, "start_run"):
-            model, sampler = self.IntBay.start_run(self, sampler)
+            model, sampler = self.IntBay.start_run(
+                self.NumSam, self.ConPrb, self.MaxIte, self.G, sampler
+            )
         else:
             if options["PresetMode"] != "replace":
                 self.IntBay.G = dict(self.IntBay.G, p=self.ConPrb)
             model = copy.copy(self.IntBay)
             sampler = copy.copy(sampler)
 
-        # Set the historical sample-count plan and iteration bounds once.
+        # Preserve legacy budget/endpoint conventions without changing each
+        # method's numerical convergence criterion.
         policy = options["CountPolicy"]
         if policy == "padded":
             counts = np.atleast_1d(self.NumSam)
@@ -121,6 +111,8 @@ class SeMCS:
         if preset != "adaptive":
             sampler.BayStc = model
 
+        # Product methods keep sampled-domain G only; transition histories
+        # also retain the unsampled next G required by the native estimators.
         x_history, y_history = [], []
         g_history = [] if options["StateHistory"] == "sample" else [copy.deepcopy(model.G)]
         sample_counts, chain_shapes, call_counts = [], [], []
@@ -155,8 +147,8 @@ class SeMCS:
             if options["StateHistory"] == "sample":
                 g_history.append(copy.deepcopy(model.G))
 
-            # UpdObj/update: keep the original scientific function signatures.
-            if options["UpdateOutputs"] == 1:
+            # Candidate-domain methods retain update; ordinary ISDs share UpdObj.
+            if hasattr(model, "update"):
                 next_model = model.update(y[3], y[2], self.ConPrb)
             else:
                 if level + 1 < len(schedule):
@@ -175,8 +167,6 @@ class SeMCS:
                         if not isinstance(specified, dict):
                             specified = dict(parameters=specified)
                         model.G = prescribed_state(previous, specified)
-                elif options["UpdateOutputs"] == 2:
-                    _, model = model.UpdObj(y, self.ConPrb)
                 else:
                     y, _, model, extra = model.UpdObj(x, y, self.ConPrb)
                     y_history[-1] = y
