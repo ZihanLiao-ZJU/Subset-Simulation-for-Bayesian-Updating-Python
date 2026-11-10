@@ -11,8 +11,8 @@ Python implementation of subset simulation (SuS) for Bayesian evidence estimatio
 - [Requirements](#requirements)
 - [Repository structure](#repository-structure)
 - [Quick start](#quick-start)
-- [Benchmark likelihoods](#benchmark-likelihoods)
-- [Custom likelihood](#custom-likelihood)
+- [Built-in examples](#built-in-examples)
+- [Using a custom likelihood](#using-a-custom-likelihood)
 - [Outputs](#outputs)
 - [Differences from the MATLAB version](#differences-from-the-matlab-version)
 - [Citation](#citation)
@@ -60,6 +60,7 @@ pip install -r requirements.txt
 Every toolbox includes the same `SeMCS(sampler).RunIte()` loop. Method classes own initialization, intermediate updates, seed selection and convergence. Fixed MCMC options are sampler attributes; evolving proposal scales and trajectory times are stored in the model's `G`. Each repository runs independently.
 
 ```text
+.
 ├── LICENSE
 ├── README.md
 ├── drive_evidence.py
@@ -132,7 +133,7 @@ x_pos = out_ps.PosSim()[0]     # posterior samples in standard normal space
 theta_pos = Tfun.Pdis.U2X(x_pos)
 ```
 
-## Benchmark likelihoods
+## Built-in examples
 
 | File | Description | Dimension | Reference log-evidence |
 |---|---|---|---|
@@ -140,9 +141,9 @@ theta_pos = Tfun.Pdis.U2X(x_pos)
 | `LKF_nD_GaussianLogGamma.py` | Gaussian + LogGamma mixture (skewed), uniform prior on [−30, 30]ⁿ | n | −8.19 (n = 2), −20.47 (n = 5), −40.94 (n = 10), −81.89 (n = 20), −122.82 (n = 30) |
 | `LKF_2D_Eggbox.py` | eggbox (multimodal), uniform prior on [0, 10π]² | 2 | 235.856 |
 
-Each class also stores its reference value as `logz_ref`. To solve your own problem, see [Custom likelihood](#custom-likelihood).
+Each class also stores its reference value as `logz_ref`. To solve your own problem, see [Custom likelihood](#using-a-custom-likelihood).
 
-## Custom likelihood
+## Using a custom likelihood
 
 Any user-defined Bayesian updating problem can be solved by writing a likelihood class with the same interface as the files in `sus_bayes/likelihood_functions/` and passing it to the driver in place of the benchmark. The algorithm only accesses the following members:
 
@@ -246,3 +247,4 @@ If you use this code in your research, please cite:
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
+
