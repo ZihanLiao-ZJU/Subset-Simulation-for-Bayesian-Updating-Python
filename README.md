@@ -104,18 +104,16 @@ Every toolbox includes the same `SeMCS(sampler).RunIte()` loop. Method classes o
 
 ## Quick start
 
-Set `MaxIte` to the maximum number of sampled levels. A scalar `NumSam` is reused; a vector is a finite per-level budget. The run returns when either limit is reached, and `flg_cvg` reports the method's own convergence criterion. Entries in `G` patch intermediate states; omitted fields and carried `lambda`/`HMC_time` are retained.
-
-Run one of the drivers from the repository root:
+Run either driver once from the repository root with the `aCS` sampler:
 
 ```bash
-python drive_evidence.py     # Bayesian evidence estimation
-python drive_posterior.py    # posterior sampling
+python drive_evidence.py --nrun 1 --sampler aCS
+python drive_posterior.py --nrun 1 --sampler aCS
 ```
 
-Both drivers use 1000 samples per level. `drive_evidence.py` runs 500 repetitions with `Ndim = 5`, and `drive_posterior.py` runs 5 repetitions with `Ndim = 2`; `--nrun` changes the number of runs and `--seed` fixes the random seed. To change the problem, edit `Ndim` and the `Tfun = ...` line in the *Define likelihood function* section of the driver.
+Both drivers set `Nsam = 1000` and assign it to `ss.NumSam`. Change this scalar for the sample size per level, and edit `Ndim` and `Tfun` in the chosen driver to select the problem. The default likelihood is `LKF_nD_GaussianShells`, with dimension 5 for evidence estimation and 2 for posterior sampling. Use `--sampler` to choose the MCMC sampler and `--seed` to fix the random seed.
 
-The same steps from Python code:
+The same single evidence and posterior run from Python:
 
 ```python
 from sus_bayes import LKF_nD_GaussianShells, SuS_Bay_Nataf, aCS, SeMCS, NumSim
@@ -125,8 +123,8 @@ IntBay = SuS_Bay_Nataf(Tfun)
 ss = SeMCS(aCS(IntBay))
 ss.NumSam = 1000
 
-out_ss = ss.RunIte()           # one subset simulation run
-out_ps = NumSim(out_ss)        # post-processing
+out_ss = ss.RunIte()
+out_ps = NumSim(out_ss)
 print(out_ps.Z)                # log-evidence
 x_pos = out_ps.PosSim()[0]     # posterior samples in standard normal space
 theta_pos = Tfun.Pdis.U2X(x_pos)
