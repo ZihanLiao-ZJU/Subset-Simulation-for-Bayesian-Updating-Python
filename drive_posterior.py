@@ -1,11 +1,4 @@
-"""Driver: posterior sampling and effective sample size.
-
-Python port of drive_posterior.m. Run from the repository root:
-
-    python drive_posterior.py           # 5 runs, Ndim = 2 (as in MATLAB)
-    python drive_posterior.py --plot    # also plot the posterior samples of the last run
-"""
-import argparse
+"""Edit the settings below, then run this script from the repository root."""
 
 import numpy as np
 
@@ -15,19 +8,13 @@ from sus_bayes import (LKF_2D_Eggbox, LKF_nD_GaussianLogGamma, LKF_nD_GaussianSh
                        SeMCS, NumSim, SuS_Bay_Nataf, aCS)
 from sus_bayes.support_functions import SamPlt
 
-parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-parser.add_argument("--nrun", type=int, default=5, help="number of repeated runs (default 5)")
-parser.add_argument("--seed", type=int, default=None, help="random seed")
-parser.add_argument("--plot", action="store_true", help="plot the posterior samples of the last run")
-parser.add_argument("--sampler", choices=["CW_aMH", "aCS", "HMC", "ES"], default="aCS")
-args = parser.parse_args()
-SamplerClass = {"CW_aMH": CW_aMH, "aCS": aCS, "HMC": HMC, "ES": ES}[args.sampler]
-if args.seed is not None:
-    np.random.seed(args.seed)
+# Sampler selection: CW_aMH, aCS, HMC or ES.
+SamplerClass = aCS
+PlotPosterior = False
 
 # %% Initialization and settings
 Nsam = 1000         # number of samples per iteration
-Nrun = args.nrun    # number of repeated runs
+Nrun = 5    # number of repeated runs
 Ndim = 2            # dimensionality of the parameter space
 
 # %% Define likelihood function (choose one)
@@ -72,5 +59,5 @@ print(f"  Ness (mean)        : {np.mean(Ness):.1f}")
 print(f"  Ness_rat_mu        : {Ness_rat_mu:.4f}")
 print("================================================")
 
-if args.plot:
+if PlotPosterior:
     SamPlt(theta_pos)

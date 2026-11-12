@@ -1,11 +1,4 @@
-"""Driver: log-evidence estimation over repeated subset simulation runs.
-
-Python port of drive_evidence.m. Run from the repository root:
-
-    python drive_evidence.py            # 500 runs, Ndim = 5 (as in MATLAB)
-    python drive_evidence.py --nrun 50  # fewer runs
-"""
-import argparse
+"""Edit the settings below, then run this script from the repository root."""
 
 import numpy as np
 
@@ -14,18 +7,12 @@ from sus_bayes.mcmc_samplers import CW_aMH, aCS, HMC, ES
 from sus_bayes import (LKF_2D_Eggbox, LKF_nD_GaussianLogGamma, LKF_nD_GaussianShells,  # noqa: F401
                        SeMCS, NumSim, SuS_Bay_Nataf, aCS)
 
-parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-parser.add_argument("--nrun", type=int, default=500, help="number of repeated runs (default 500)")
-parser.add_argument("--seed", type=int, default=None, help="random seed")
-parser.add_argument("--sampler", choices=["CW_aMH", "aCS", "HMC", "ES"], default="aCS")
-args = parser.parse_args()
-SamplerClass = {"CW_aMH": CW_aMH, "aCS": aCS, "HMC": HMC, "ES": ES}[args.sampler]
-if args.seed is not None:
-    np.random.seed(args.seed)
+# Sampler selection: CW_aMH, aCS, HMC or ES.
+SamplerClass = aCS
 
 # %% Initialization and settings
 Nsam = 1000         # number of samples per iteration
-Nrun = args.nrun    # number of repeated runs
+Nrun = 500    # number of repeated runs
 Ndim = 5            # dimensionality of the parameter space
 
 # %% Define likelihood function (choose one)

@@ -102,31 +102,20 @@ pip install -r requirements.txt
 
 ## Quick start
 
-Run either driver once from the repository root with the `aCS` sampler:
+Edit `Tfun`, `Ndim`, `Nsam`, `Nrun` and `SamplerClass` inside `drive_evidence.py` or `drive_posterior.py`. Select `SamplerClass = aCS` (the default), or choose another supplied sampler: `CW_aMH`, `aCS`, `HMC` or `ES`.
+
+Both scripts use `LKF_nD_GaussianShells` and 1000 samples per level. Evidence estimation defaults to dimension 5 and 500 runs; posterior sampling defaults to dimension 2 and 5 runs. For a single run, set `Nrun = 1` inside the script.
+
+Run the chosen script from the repository root:
 
 ```bash
-python drive_evidence.py --nrun 1 --sampler aCS
-python drive_posterior.py --nrun 1 --sampler aCS
+python drive_evidence.py
+python drive_posterior.py
 ```
 
-Both drivers set `Nsam = 1000` and assign it to `ss.NumSam`. Change this scalar for the sample size per level, and edit `Ndim` and `Tfun` in the chosen driver to select the problem. The default likelihood is `LKF_nD_GaussianShells`, with dimension 5 for evidence estimation and 2 for posterior sampling. Use `--sampler` to choose the MCMC sampler and `--seed` to fix the random seed.
+Use `drive_evidence` for evidence estimation or `drive_posterior` for posterior sampling.
 
-The same single evidence and posterior run from Python:
-
-```python
-from sus_bayes import LKF_nD_GaussianShells, SuS_Bay_Nataf, aCS, SeMCS, NumSim
-
-Tfun = LKF_nD_GaussianShells(5)
-IntBay = SuS_Bay_Nataf(Tfun)
-ss = SeMCS(aCS(IntBay))
-ss.NumSam = 1000
-
-out_ss = ss.RunIte()
-out_ps = NumSim(out_ss)
-print(out_ps.Z)                # log-evidence
-x_pos = out_ps.PosSim()[0]     # posterior samples in standard normal space
-theta_pos = Tfun.Pdis.U2X(x_pos)
-```
+Use multiple runs to estimate statistics across independent runs.
 
 ## Built-in examples
 
@@ -215,7 +204,6 @@ Signed-log arithmetic retains an inherited limitation: an all-negative signed-lo
 
 - The iteration class is `SeMCS` in both languages, and `RunIte` returns a dictionary instead of a struct.
 - Arrays keep the MATLAB layout (`Ndim × Nc × Ns`, flattened in column-major order), so indices printed by the two versions agree; Python indices start at 0.
-- Random numbers are drawn through `sus_bayes._utils` (`randn`, `rand`, `randperm`, `randi`, `randsample`), backed by NumPy; `np.random.seed` fixes a run.
 - Frozen wrappers such as `Distribution("Normal", scipy.stats.norm(...))` need not expose `mu`/`sigma` attributes: they use their generic `icdf` mapping. Parameterized `makedist` Normal/Lognormal objects retain direct transforms to avoid CDF saturation in extreme tails.
 - Parameterized GEV transforms retain the Python port's existing CDF clipping to `[1e-15, 1 - 1e-15]` (and near-zero-shape limit). This stabilizes tails but is intentionally not identical to the MATLAB source's unclipped `icdf(normcdf(...))`; generic frozen wrappers use their own `icdf` instead.
 - General non-Normal/Lognormal correlation conversion now searches negative latent correlations for negative target pairs and preserves exactly zero pairs. This corrects the MATLAB source's inherited nonnegative search interval, rather than reproducing it. Python supplies `GauIntPot`, which is absent from the public MATLAB repository. Numerical quadrature and marginal correlation feasibility remain limitations for arbitrary distributions/extreme correlations.
